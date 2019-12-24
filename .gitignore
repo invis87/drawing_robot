@@ -1,2 +1,4 @@
 .pio
 CMakeListsPrivate.txt
+rust/.idea
+rust/Cargo.lock
