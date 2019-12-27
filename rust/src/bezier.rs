@@ -1,4 +1,4 @@
-use svgtypes::PathSegment;
+use svgtypes::{PathCommand, PathSegment};
 
 #[derive(PartialEq)]
 pub enum MoveType {
@@ -39,17 +39,28 @@ pub struct Point {
     pub y: f64,
 }
 
+pub struct SupportPoint {
+    path_command: PathCommand,
+    point: Point,
+}
+
 pub struct PointIterator {
     time: BezierTick,
     calc_formula: Box<dyn Fn(f64) -> Point>,
     pub move_type: MoveType,
-    support_point: Option<Point>, //support point is always in absolute
+    support_point: Option<SupportPoint>, //support point is always in absolute
 }
 
 impl PointIterator {
-    pub fn get_support_point(&self) -> Option<Point> {
+    pub fn get_support_point(&self) -> Option<SupportPoint> {
         match &self.support_point {
-            Some(p) => Some(Point { x: p.x, y: p.y }),
+            Some(supp_p) => Some(SupportPoint {
+                path_command: supp_p.path_command,
+                point: Point {
+                    x: supp_p.point.x,
+                    y: supp_p.point.y,
+                },
+            }),
             None => None,
         }
     }
@@ -111,7 +122,7 @@ fn cubic_curve(start: Point, p1: Point, p2: Point, end: Point) -> Box<dyn Fn(f64
 pub fn calc_point_iterator(
     current: Point,
     next_segment: PathSegment,
-    prev_supp_point_opt: Option<Point>,
+    prev_supp_point_opt: Option<SupportPoint>,
 ) -> PointIterator {
     let time = BezierTick::new();
 
@@ -168,7 +179,10 @@ pub fn calc_point_iterator(
             let end_point = absolute_point_coord(&current, abs, x, y);
             let p1 = absolute_point_coord(&current, abs, x1, y1);
             let p2 = absolute_point_coord(&current, abs, x2, y2);
-            let support_point = Some(Point { x: p2.x, y: p2.y });
+            let support_point = Some(SupportPoint {
+                path_command: next_segment.cmd(),
+                point: Point { x: p2.x, y: p2.y },
+            });
             let calc_formula = cubic_curve(current, p1, p2, end_point);
             PointIterator {
                 time,
@@ -180,20 +194,27 @@ pub fn calc_point_iterator(
         PathSegment::SmoothCurveTo { abs, x2, y2, x, y } => {
             let p1 = match prev_supp_point_opt {
                 Some(prev_support_point) => {
-                    let mirrored_x = current.x + current.x - prev_support_point.x;
-                    let mirrored_y = current.y + current.y - prev_support_point.y;
-                    //todo: here I assume that prev control point is always of my type
-                    //todo: but it may not and if so I should ignore it and return Point { x: x2, y: y2 }
-                    Point {
-                        x: mirrored_x,
-                        y: mirrored_y,
+                    if (prev_support_point.path_command == PathCommand::SmoothCurveTo
+                        || prev_support_point.path_command == PathCommand::CurveTo)
+                    {
+                        let mirrored_x = current.x + current.x - prev_support_point.point.x;
+                        let mirrored_y = current.y + current.y - prev_support_point.point.y;
+                        Point {
+                            x: mirrored_x,
+                            y: mirrored_y,
+                        }
+                    } else {
+                        Point { x: x2, y: y2 }
                     }
                 }
                 None => Point { x: x2, y: y2 },
             };
             let end_point = absolute_point_coord(&current, abs, x, y);
             let p2 = absolute_point_coord(&current, abs, x2, y2);
-            let support_point = Some(Point { x: p2.x, y: p2.y });
+            let support_point = Some(SupportPoint {
+                path_command: next_segment.cmd(),
+                point: Point { x: p2.x, y: p2.y },
+            });
             let calc_formula = cubic_curve(current, p1, p2, end_point);
             PointIterator {
                 time,
@@ -205,7 +226,10 @@ pub fn calc_point_iterator(
         PathSegment::Quadratic { abs, x1, y1, x, y } => {
             let end_point = absolute_point_coord(&current, abs, x, y);
             let p1 = absolute_point_coord(&current, abs, x1, y1);
-            let support_point = Some(Point { x: p1.x, y: p1.y });
+            let support_point = Some(SupportPoint {
+                path_command: next_segment.cmd(),
+                point: Point { x: p1.x, y: p1.y },
+            });
             let calc_formula = square_curve(current, p1, end_point);
             PointIterator {
                 time,
@@ -217,12 +241,20 @@ pub fn calc_point_iterator(
         PathSegment::SmoothQuadratic { abs, x, y } => {
             let p1 = match prev_supp_point_opt {
                 Some(prev_support_point) => {
-                    let mirrored_x = current.x + current.x - prev_support_point.x;
-                    let mirrored_y = current.y + current.y - prev_support_point.y;
-                    //todo: same problem as for SmoothCurveTo
-                    Point {
-                        x: mirrored_x,
-                        y: mirrored_y,
+                    if (prev_support_point.path_command == PathCommand::SmoothQuadratic
+                        || prev_support_point.path_command == PathCommand::Quadratic)
+                    {
+                        let mirrored_x = current.x + current.x - prev_support_point.point.x;
+                        let mirrored_y = current.y + current.y - prev_support_point.point.y;
+                        Point {
+                            x: mirrored_x,
+                            y: mirrored_y,
+                        }
+                    } else {
+                        Point {
+                            x: current.x,
+                            y: current.y,
+                        }
                     }
                 }
                 None => Point {
@@ -231,7 +263,10 @@ pub fn calc_point_iterator(
                 },
             };
             let end_point = absolute_point_coord(&current, abs, x, y);
-            let support_point = Some(Point { x: p1.x, y: p1.y });
+            let support_point = Some(SupportPoint {
+                path_command: next_segment.cmd(),
+                point: Point { x: p1.x, y: p1.y },
+            });
             let calc_formula = square_curve(current, p1, end_point);
             PointIterator {
                 time,

@@ -1,3 +1,5 @@
+#![allow(unused_parens)]
+
 use skulpin::AppControl;
 use skulpin::CoordinateSystemHelper;
 use skulpin::InputState;
@@ -7,7 +9,7 @@ use skulpin::VirtualKeyCode;
 use skulpin::{AppHandler, CoordinateSystem};
 use std::ffi::CString;
 
-use drawing_robot::bezier::{calc_point_iterator, MoveType, Point};
+use drawing_robot::bezier::{calc_point_iterator, MoveType, Point, SupportPoint};
 use std::collections::LinkedList;
 
 fn points_to_draw() -> LinkedList<Point> {
@@ -18,7 +20,7 @@ fn points_to_draw() -> LinkedList<Point> {
 
     let mut points: LinkedList<Point> = LinkedList::new();
     let mut current_point = start_point;
-    let mut prev_supp_point: Option<Point> = None;
+    let mut prev_supp_point: Option<SupportPoint> = None;
     for token in path_parser {
         if let Ok(path_segment) = token {
             let point_iterator = calc_point_iterator(current_point, path_segment, prev_supp_point);
