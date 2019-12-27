@@ -7,31 +7,28 @@ use skulpin::VirtualKeyCode;
 use skulpin::{AppHandler, CoordinateSystem};
 use std::ffi::CString;
 
-use drawing_robot::bezier::{calc_point_iterator, MoveType, Point, PointIterator};
+use drawing_robot::bezier::{calc_point_iterator, MoveType, Point};
 use std::collections::LinkedList;
-use svgtypes::PathSegment;
 
 fn points_to_draw() -> LinkedList<Point> {
     let start_point = Point { x: 0., y: 0. };
     let svg_string =
-        "M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80 M10 280 Q 52.5 210, 95 280 T 180 280 T 250 280";
+        "M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80 M10 280 Q 52.5 210, 95 280 T 180 280 T 250 280 M10 380 H 100 T 250 380 M10 480 Q 50 100, 95 480 S 150 550, 130 480";
     let path_parser = svgtypes::PathParser::from(svg_string);
 
     let mut points: LinkedList<Point> = LinkedList::new();
     let mut current_point = start_point;
-    let mut prev_segment: Option<PathSegment> = None;
+    let mut prev_supp_point: Option<Point> = None;
     for token in path_parser {
         if let Ok(path_segment) = token {
-            let point_iterator = calc_point_iterator(current_point, path_segment, prev_segment);
+            let point_iterator = calc_point_iterator(current_point, path_segment, prev_supp_point);
+            prev_supp_point = point_iterator.get_support_point();
+            current_point = point_iterator.get_end_position();
             if (point_iterator.move_type != MoveType::Fly) {
                 for point in point_iterator {
                     points.push_back(point);
                 }
-                current_point = points.back().unwrap().clone();
-            } else {
-                current_point = point_iterator.last().unwrap();
             }
-            prev_segment = Some(path_segment);
         }
     }
 
@@ -85,7 +82,7 @@ impl AppHandler for ExampleApp {
         &mut self,
         _app_control: &AppControl,
         _input_state: &InputState,
-        time_state: &TimeState,
+        _time_state: &TimeState,
         canvas: &mut skia_safe::Canvas,
         _coordinate_system_helper: &CoordinateSystemHelper,
     ) {
