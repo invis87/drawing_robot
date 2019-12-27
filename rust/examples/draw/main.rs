@@ -1,6 +1,3 @@
-// This example shows how to use the "app" helpers to get a window open and drawing with minimal code
-// It's not as flexible as working with winit directly, but it's quick and simple
-
 use skulpin::AppControl;
 use skulpin::CoordinateSystemHelper;
 use skulpin::InputState;
@@ -95,17 +92,13 @@ impl AppHandler for ExampleApp {
         // Generally would want to clear data every time we draw
         canvas.clear(skia_safe::Color::from_argb(0, 0, 0, 255));
 
-        // Floating point value constantly moving between 0..1 to generate some movement
-        let f = ((time_state.update_count() as f32 / 30.0).sin() + 1.0) / 2.0;
-
         // Make a color to draw with
         let mut paint = skia_safe::Paint::new(skia_safe::Color4f::new(1., 0., 0., 1.0), None);
         paint.set_anti_alias(true);
         paint.set_style(skia_safe::paint::Style::Stroke);
         paint.set_stroke_width(2.0);
 
-        // Draw a line
-
+        // Draw SVG
         let points = points_to_draw();
         for point in points {
             canvas.draw_point(
