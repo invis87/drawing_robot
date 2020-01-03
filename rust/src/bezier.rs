@@ -81,7 +81,7 @@ impl Iterator for PointIterator {
     }
 }
 
-fn linear_curve(start: Point, end: Point) -> Box<dyn Fn(f64) -> Point> {
+fn linear_curve(start_x: f64, start_y: f64, end_x: f64, end_y: f64) -> Box<dyn Fn(f64) -> Point> {
     Box::new(move |t: f64| {
         let x = start.x * (1. - t) + end.x * t;
         let y = start.y * (1. - t) + end.y * t;
@@ -124,49 +124,14 @@ pub fn calc_point_iterator(
     next_segment: PathSegment,
     prev_supp_point_opt: Option<SupportPoint>,
 ) -> PointIterator {
-    let time = BezierTick::new();
+
+    let time = BezierTick::new(); //todo: remove me
 
     match next_segment {
-        PathSegment::MoveTo { abs, x, y } => {
-            let end_point = absolute_point_coord(&current, abs, x, y);
-            let calc_formula = linear_curve(current, end_point);
-            PointIterator {
-                time,
-                calc_formula,
-                move_type: MoveType::Fly,
-                support_point: None,
-            }
-        }
-        PathSegment::LineTo { abs, x, y } => {
-            let end_point = absolute_point_coord(&current, abs, x, y);
-            let calc_formula = linear_curve(current, end_point);
-            PointIterator {
-                time,
-                calc_formula,
-                move_type: MoveType::Draw,
-                support_point: None,
-            }
-        }
-        PathSegment::HorizontalLineTo { abs, x } => {
-            let end_point = absolute_point_coord(&current, abs, x, current.y);
-            let calc_formula = linear_curve(current, end_point);
-            PointIterator {
-                time,
-                calc_formula: Box::new(calc_formula),
-                move_type: MoveType::Draw,
-                support_point: None,
-            }
-        }
-        PathSegment::VerticalLineTo { abs, y } => {
-            let end_point = absolute_point_coord(&current, abs, current.x, y);
-            let calc_formula = linear_curve(current, end_point);
-            PointIterator {
-                time,
-                calc_formula: Box::new(calc_formula),
-                move_type: MoveType::Draw,
-                support_point: None,
-            }
-        }
+        PathSegment::MoveTo { abs, x, y } => move_to(&current, abs, x, y),
+        PathSegment::LineTo { abs, x, y } => line_to(&current, abs, x, y),
+        PathSegment::HorizontalLineTo { abs, x } => line_to(&current, abs, x, current.y),
+        PathSegment::VerticalLineTo { abs, y } => line_to(&current, abs, current.x, y),
         PathSegment::CurveTo {
             abs,
             x1,
@@ -280,7 +245,7 @@ pub fn calc_point_iterator(
         _ => {
             //todo: remove me
             let end_point = absolute_point_coord(&current, true, 20., 33.);
-            let calc_formula = linear_curve(current, end_point);
+            let calc_formula = linear_curve(current.x, current.y, end_point.x, end_point.y);
             PointIterator {
                 time,
                 calc_formula,
@@ -289,6 +254,26 @@ pub fn calc_point_iterator(
             }
         }
     }
+}
+
+fn line_point_iterator(current: &Point, abs: bool, x: f64, y: f64, move_type: MoveType) -> PointIterator {
+    let time = BezierTick::new();
+    let end_point = absolute_point_coord(&current, abs, x, y);
+    let calc_formula = linear_curve(current.x, current.y, end_point.x, end_point.y);
+    PointIterator {
+        time,
+        calc_formula,
+        move_type,
+        support_point: None,
+    }
+}
+
+fn move_to(current: &Point, abs: bool, x: f64, y: f64) -> PointIterator {
+    line_point_iterator(current, abs, x, y, MoveType::Fly)
+}
+
+fn line_to(current: &Point, abs: bool, x: f64, y: f64) -> PointIterator {
+    line_point_iterator(current, abs, x, y, MoveType::Draw)
 }
 
 fn absolute_point_coord(start: &Point, abs: bool, x: f64, y: f64) -> Point {
