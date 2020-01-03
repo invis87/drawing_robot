@@ -152,7 +152,7 @@ pub fn calc_point_iterator(
             x,
             y,
             prev_supp_point_opt,
-            next_segment,
+            next_segment
         ),
         PathSegment::Quadratic { abs, x1, y1, x, y } => {
             quadratic_curve_to(&current, abs, x1, y1, x, y, next_segment)
@@ -212,7 +212,7 @@ fn cubic_curve_to(
     y2: f64,
     x: f64,
     y: f64,
-    next_segment: PathSegment,
+    next_segment: PathSegment
 ) -> PointIterator {
     let time = BezierTick::new();
     let p1 = absolute_point_coord(&current, abs, x1, y1);
