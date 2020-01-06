@@ -20,11 +20,12 @@ fn points_to_draw() -> LinkedList<Point> {
 
     let mut points: LinkedList<Point> = LinkedList::new();
     let mut current_point = start_point;
-    let mut prev_supp_point: Option<SupportPoint> = None;
+    let mut prev_support_point_opt: Option<SupportPoint> = None;
     for token in path_parser {
         if let Ok(path_segment) = token {
-            let point_iterator = calc_point_iterator(current_point, path_segment, prev_supp_point);
-            prev_supp_point = point_iterator.get_support_point();
+            let point_iterator =
+                calc_point_iterator(current_point, path_segment, prev_support_point_opt);
+            prev_support_point_opt = point_iterator.get_support_point();
             current_point = point_iterator.get_end_position();
             if (point_iterator.move_type != MoveType::Fly) {
                 for point in point_iterator {

@@ -129,7 +129,7 @@ fn cubic_curve(
 pub fn calc_point_iterator(
     current: Point,
     next_segment: PathSegment,
-    prev_supp_point_opt: Option<SupportPoint>,
+    prev_support_point_opt: Option<SupportPoint>,
 ) -> PointIterator {
     match next_segment {
         PathSegment::MoveTo { abs, x, y } => move_to(&current, abs, x, y),
@@ -152,14 +152,14 @@ pub fn calc_point_iterator(
             y2,
             x,
             y,
-            prev_supp_point_opt,
-            next_segment
+            prev_support_point_opt,
+            next_segment,
         ),
         PathSegment::Quadratic { abs, x1, y1, x, y } => {
             quadratic_curve_to(&current, abs, x1, y1, x, y, next_segment)
         }
         PathSegment::SmoothQuadratic { abs, x, y } => {
-            smooth_quadratic_curve_to(&current, abs, x, y, prev_supp_point_opt, next_segment)
+            smooth_quadratic_curve_to(&current, abs, x, y, prev_support_point_opt, next_segment)
         }
         //        PathSegment::EllipticalArc{abs, rx, ry, x_axis_rotation, large_arc, sweep, x, y} => (),
         //        PathSegment::ClosePath{abs} => ()
@@ -213,7 +213,7 @@ fn cubic_curve_to(
     y2: f64,
     x: f64,
     y: f64,
-    next_segment: PathSegment
+    next_segment: PathSegment,
 ) -> PointIterator {
     let time = BezierTick::new();
     let p1 = absolute_point_coord(&current, abs, x1, y1);
@@ -239,27 +239,10 @@ fn smooth_cubic_curve_to(
     y2: f64,
     x: f64,
     y: f64,
-    prev_supp_point_opt: Option<SupportPoint>,
+    prev_support_point_opt: Option<SupportPoint>,
     next_segment: PathSegment,
 ) -> PointIterator {
-    let p1 = match prev_supp_point_opt {
-        Some(prev_support_point) => {
-            if (prev_support_point.path_command == PathCommand::SmoothCurveTo
-                || prev_support_point.path_command == PathCommand::CurveTo)
-            {
-                let mirrored_x = current.x + current.x - prev_support_point.point.x;
-                let mirrored_y = current.y + current.y - prev_support_point.point.y;
-                Point {
-                    x: mirrored_x,
-                    y: mirrored_y,
-                }
-            } else {
-                Point { x: current.x, y: current.y }
-            }
-        }
-        None => Point { x: current.x, y: current.y },
-    };
-
+    let p1 = mirrored_point(current, abs, prev_support_point_opt, CurveType::Cubic);
     cubic_curve_to(current, abs, p1.x, p1.y, x2, y2, x, y, next_segment)
 }
 
@@ -293,33 +276,10 @@ fn smooth_quadratic_curve_to(
     abs: bool,
     x: f64,
     y: f64,
-    prev_supp_point_opt: Option<SupportPoint>,
+    prev_support_point_opt: Option<SupportPoint>,
     next_segment: PathSegment,
 ) -> PointIterator {
-    let p1 = match prev_supp_point_opt {
-        Some(prev_support_point) => {
-            if (prev_support_point.path_command == PathCommand::SmoothQuadratic
-                || prev_support_point.path_command == PathCommand::Quadratic)
-            {
-                let mirrored_x = current.x + current.x - prev_support_point.point.x;
-                let mirrored_y = current.y + current.y - prev_support_point.point.y;
-                Point {
-                    x: mirrored_x,
-                    y: mirrored_y,
-                }
-            } else {
-                Point {
-                    x: current.x,
-                    y: current.y,
-                }
-            }
-        }
-        None => Point {
-            x: current.x,
-            y: current.y,
-        },
-    };
-
+    let p1 = mirrored_point(current, abs, prev_support_point_opt, CurveType::Quadratic);
     quadratic_curve_to(current, abs, p1.x, p1.y, x, y, next_segment)
 }
 
@@ -331,4 +291,49 @@ fn absolute_point_coord(start: &Point, abs: bool, x: f64, y: f64) -> Point {
             y: y + start.y,
         },
     }
+}
+
+enum CurveType {
+    Cubic,
+    Quadratic,
+}
+
+fn path_command_condition(prev_support_point: &SupportPoint, curve_type: CurveType) -> bool {
+    match curve_type {
+        CurveType::Cubic => {
+            prev_support_point.path_command == PathCommand::SmoothCurveTo
+                || prev_support_point.path_command == PathCommand::CurveTo
+        }
+
+        CurveType::Quadratic => {
+            prev_support_point.path_command == PathCommand::SmoothQuadratic
+                || prev_support_point.path_command == PathCommand::Quadratic
+        }
+    }
+}
+
+fn mirrored_point(
+    current: &Point,
+    abs: bool,
+    prev_support_point_opt: Option<SupportPoint>,
+    curve_type: CurveType,
+) -> Point {
+    let mut mirrored_point = match prev_support_point_opt {
+        Some(prev_support_point) if path_command_condition(&prev_support_point, curve_type) => {
+            let mirrored_x = current.x - prev_support_point.point.x;
+            let mirrored_y = current.y - prev_support_point.point.y;
+            Point {
+                x: mirrored_x,
+                y: mirrored_y,
+            }
+        }
+        _ => Point { x: 0., y: 0. },
+    };
+
+    if abs {
+        mirrored_point.x += current.x;
+        mirrored_point.y += current.y;
+    }
+
+    mirrored_point
 }
