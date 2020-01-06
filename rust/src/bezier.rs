@@ -126,6 +126,36 @@ fn cubic_curve(
     })
 }
 
+const PI: f64 = 3.14159265358979323846264338327950288_f64;
+
+fn map_to_part_of_circle(time: f64) -> f64 {
+    time / 1.0 * 2.0 * PI
+}
+
+fn ellipse_curve(
+    start_x: f64,
+    start_y: f64,
+    rx: f64,
+    ry: f64,
+    x_axis_rotation: f64,
+) -> Box<dyn Fn(f64) -> Point> {
+    Box::new(move |t: f64| {
+        let x_rad_rotation: f64 = x_axis_rotation * PI / 180.0;
+        let circle_time = map_to_part_of_circle(t);
+
+        let x = rx * circle_time.cos();
+        let y = ry * circle_time.sin();
+
+        let x_after_rotation = start_x + x * x_rad_rotation.cos() - y * x_rad_rotation.sin();
+        let y_after_rotation = start_y + x * x_rad_rotation.sin() + y * x_rad_rotation.cos();
+
+        Point {
+            x: x_after_rotation,
+            y: y_after_rotation,
+        }
+    })
+}
+
 pub fn calc_point_iterator(
     current: Point,
     next_segment: PathSegment,
@@ -161,7 +191,16 @@ pub fn calc_point_iterator(
         PathSegment::SmoothQuadratic { abs, x, y } => {
             smooth_quadratic_curve_to(&current, abs, x, y, prev_support_point_opt, next_segment)
         }
-        //        PathSegment::EllipticalArc{abs, rx, ry, x_axis_rotation, large_arc, sweep, x, y} => (),
+        PathSegment::EllipticalArc {
+            abs,
+            rx,
+            ry,
+            x_axis_rotation,
+            large_arc,
+            sweep,
+            x,
+            y,
+        } => ellipse_curve_to(&current, abs, rx, ry, x_axis_rotation),
         //        PathSegment::ClosePath{abs} => ()
         _ => {
             //todo: remove me
@@ -281,6 +320,23 @@ fn smooth_quadratic_curve_to(
 ) -> PointIterator {
     let p1 = mirrored_point(current, abs, prev_support_point_opt, CurveType::Quadratic);
     quadratic_curve_to(current, abs, p1.x, p1.y, x, y, next_segment)
+}
+
+fn ellipse_curve_to(
+    current: &Point,
+    abs: bool,
+    rx: f64,
+    ry: f64,
+    x_axis_rotation: f64,
+) -> PointIterator {
+    let time = BezierTick::new();
+    let calc_formula = ellipse_curve(current.x, current.y, rx, ry, x_axis_rotation);
+    PointIterator {
+        time,
+        calc_formula,
+        move_type: MoveType::Draw,
+        support_point: None,
+    }
 }
 
 fn absolute_point_coord(start: &Point, abs: bool, x: f64, y: f64) -> Point {
