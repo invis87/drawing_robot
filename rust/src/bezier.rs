@@ -39,6 +39,7 @@ pub struct Point {
     pub y: f64,
 }
 
+#[derive(Debug)]
 pub struct SupportPoint {
     path_command: PathCommand,
     point: Point,
@@ -253,10 +254,10 @@ fn smooth_cubic_curve_to(
                     y: mirrored_y,
                 }
             } else {
-                Point { x: x2, y: y2 }
+                Point { x: current.x, y: current.y }
             }
         }
-        None => Point { x: x2, y: y2 },
+        None => Point { x: current.x, y: current.y },
     };
 
     cubic_curve_to(current, abs, p1.x, p1.y, x2, y2, x, y, next_segment)
