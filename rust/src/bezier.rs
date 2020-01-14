@@ -1,10 +1,13 @@
+use svgtypes::PathCommand::MoveTo;
 use svgtypes::{PathCommand, PathSegment};
+use winit::window::CursorIcon::Move;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Copy, Clone)]
 pub enum MoveType {
     Fly,
     Draw,
     Erase,
+    Ellipse,
 }
 
 struct BezierTick {
@@ -45,15 +48,70 @@ pub struct SupportPoint {
     point: Point,
 }
 
-pub struct PointIterator {
-    time: BezierTick,
-    calc_formula: Box<dyn Fn(f64) -> Point>,
-    pub move_type: MoveType,
-    support_point: Option<SupportPoint>, //support point is always in absolute
+pub trait PointIterator {
+    fn get_support_point(&self) -> Option<SupportPoint>; //support point is always in absolute
+    fn get_end_position(&self) -> Point;
+    fn move_type(&self) -> &MoveType;
+
+    fn next(&mut self) -> Option<Point>;
 }
 
-impl PointIterator {
-    pub fn get_support_point(&self) -> Option<SupportPoint> {
+pub struct LinePointIterator {
+    end_x: f64,
+    end_y: f64,
+    move_type: MoveType,
+    done: bool,
+}
+
+impl LinePointIterator {
+    fn new(end_x: f64, end_y: f64, move_type: MoveType) -> Self {
+        LinePointIterator {
+            end_x,
+            end_y,
+            move_type,
+            done: false,
+        }
+    }
+}
+
+impl PointIterator for LinePointIterator {
+    fn get_support_point(&self) -> Option<SupportPoint> {
+        None
+    }
+
+    fn get_end_position(&self) -> Point {
+        Point {
+            x: self.end_x,
+            y: self.end_y,
+        }
+    }
+
+    fn move_type(&self) -> &MoveType {
+        &self.move_type
+    }
+
+    fn next(&mut self) -> Option<Point> {
+        if self.done {
+            None
+        } else {
+            self.done = true;
+            Some(Point {
+                x: self.end_x,
+                y: self.end_y,
+            })
+        }
+    }
+}
+
+pub struct CurvePointIterator {
+    time: BezierTick,
+    calc_formula: Box<dyn Fn(f64) -> Point>,
+    move_type: MoveType,
+    support_point: Option<SupportPoint>,
+}
+
+impl PointIterator for CurvePointIterator {
+    fn get_support_point(&self) -> Option<SupportPoint> {
         match &self.support_point {
             Some(supp_p) => Some(SupportPoint {
                 path_command: supp_p.path_command,
@@ -66,15 +124,15 @@ impl PointIterator {
         }
     }
 
-    pub fn get_end_position(&self) -> Point {
+    fn get_end_position(&self) -> Point {
         (self.calc_formula)(1.0)
     }
-}
 
-impl Iterator for PointIterator {
-    type Item = Point;
+    fn move_type(&self) -> &MoveType {
+        &self.move_type
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<Point> {
         match self.time.next() {
             Some(time) => Some((self.calc_formula)(time)),
             None => None,
@@ -82,12 +140,44 @@ impl Iterator for PointIterator {
     }
 }
 
-fn linear_curve(start_x: f64, start_y: f64, end: Point) -> Box<dyn Fn(f64) -> Point> {
-    Box::new(move |t: f64| {
-        let x = start_x * (1. - t) + end.x * t;
-        let y = start_y * (1. - t) + end.y * t;
-        Point { x, y }
-    })
+pub struct EllipsePointIterator {
+    time: BezierTick,
+    calc_formula: Box<dyn Fn(f64) -> Point>,
+    end_x: f64,
+    end_y: f64,
+}
+
+impl PointIterator for EllipsePointIterator {
+    fn get_support_point(&self) -> Option<SupportPoint> {
+        None
+    }
+
+    fn get_end_position(&self) -> Point {
+        Point {
+            x: self.end_x,
+            y: self.end_y,
+        }
+    }
+
+    fn move_type(&self) -> &MoveType {
+        &MoveType::Ellipse
+    }
+
+    fn next(&mut self) -> Option<Point> {
+        //todo: change it to be based on end position, not on time
+        match self.time.next() {
+            Some(time) => Some((self.calc_formula)(time)),
+            None => None,
+        }
+    }
+}
+
+impl Iterator for dyn PointIterator {
+    type Item = Point;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next()
+    }
 }
 
 fn square_curve(start_x: f64, start_y: f64, p1: Point, end: Point) -> Box<dyn Fn(f64) -> Point> {
@@ -138,6 +228,8 @@ fn ellipse_curve(
     rx: f64,
     ry: f64,
     x_axis_rotation: f64,
+    end_x: f64,
+    end_y: f64,
 ) -> Box<dyn Fn(f64) -> Point> {
     Box::new(move |t: f64| {
         let x_rad_rotation: f64 = x_axis_rotation * PI / 180.0;
@@ -160,12 +252,12 @@ pub fn calc_point_iterator(
     current: Point,
     next_segment: PathSegment,
     prev_support_point_opt: Option<SupportPoint>,
-) -> PointIterator {
+) -> Box<dyn PointIterator> {
     match next_segment {
-        PathSegment::MoveTo { abs, x, y } => move_to(&current, abs, x, y),
-        PathSegment::LineTo { abs, x, y } => line_to(&current, abs, x, y),
-        PathSegment::HorizontalLineTo { abs, x } => line_to(&current, abs, x, current.y),
-        PathSegment::VerticalLineTo { abs, y } => line_to(&current, abs, current.x, y),
+        PathSegment::MoveTo { abs, x, y } => Box::new(move_to(&current, abs, x, y)),
+        PathSegment::LineTo { abs, x, y } => Box::new(line_to(&current, abs, x, y)),
+        PathSegment::HorizontalLineTo { abs, x } => Box::new(line_to(&current, abs, x, current.y)),
+        PathSegment::VerticalLineTo { abs, y } => Box::new(line_to(&current, abs, current.x, y)),
         PathSegment::CurveTo {
             abs,
             x1,
@@ -174,8 +266,18 @@ pub fn calc_point_iterator(
             y2,
             x,
             y,
-        } => cubic_curve_to(&current, abs, x1, y1, x2, y2, x, y, next_segment),
-        PathSegment::SmoothCurveTo { abs, x2, y2, x, y } => smooth_cubic_curve_to(
+        } => Box::new(cubic_curve_to(
+            &current,
+            abs,
+            x1,
+            y1,
+            x2,
+            y2,
+            x,
+            y,
+            next_segment,
+        )),
+        PathSegment::SmoothCurveTo { abs, x2, y2, x, y } => Box::new(smooth_cubic_curve_to(
             &current,
             abs,
             x2,
@@ -184,13 +286,24 @@ pub fn calc_point_iterator(
             y,
             prev_support_point_opt,
             next_segment,
-        ),
-        PathSegment::Quadratic { abs, x1, y1, x, y } => {
-            quadratic_curve_to(&current, abs, x1, y1, x, y, next_segment)
-        }
-        PathSegment::SmoothQuadratic { abs, x, y } => {
-            smooth_quadratic_curve_to(&current, abs, x, y, prev_support_point_opt, next_segment)
-        }
+        )),
+        PathSegment::Quadratic { abs, x1, y1, x, y } => Box::new(quadratic_curve_to(
+            &current,
+            abs,
+            x1,
+            y1,
+            x,
+            y,
+            next_segment,
+        )),
+        PathSegment::SmoothQuadratic { abs, x, y } => Box::new(smooth_quadratic_curve_to(
+            &current,
+            abs,
+            x,
+            y,
+            prev_support_point_opt,
+            next_segment,
+        )),
         PathSegment::EllipticalArc {
             abs,
             rx,
@@ -200,47 +313,37 @@ pub fn calc_point_iterator(
             sweep,
             x,
             y,
-        } => ellipse_curve_to(&current, abs, rx, ry, x_axis_rotation),
+        } => Box::new(ellipse_curve_to(
+            &current,
+            abs,
+            rx,
+            ry,
+            x_axis_rotation,
+            x,
+            y,
+        )),
         //        PathSegment::ClosePath{abs} => ()
         _ => {
             //todo: remove me
             let time = BezierTick::new();
             let end_point = absolute_point_coord(&current, true, 20., 33.);
-            let calc_formula = linear_curve(current.x, current.y, end_point);
-            PointIterator {
-                time,
-                calc_formula,
-                move_type: MoveType::Fly,
-                support_point: None,
-            }
+            Box::new(LinePointIterator::new(
+                end_point.x,
+                end_point.y,
+                MoveType::Fly,
+            ))
         }
     }
 }
 
-fn line_point_iterator(
-    current: &Point,
-    abs: bool,
-    x: f64,
-    y: f64,
-    move_type: MoveType,
-) -> PointIterator {
-    let time = BezierTick::new();
+fn move_to(current: &Point, abs: bool, x: f64, y: f64) -> LinePointIterator {
     let end_point = absolute_point_coord(&current, abs, x, y);
-    let calc_formula = linear_curve(current.x, current.y, end_point);
-    PointIterator {
-        time,
-        calc_formula,
-        move_type,
-        support_point: None,
-    }
+    LinePointIterator::new(end_point.x, end_point.y, MoveType::Fly)
 }
 
-fn move_to(current: &Point, abs: bool, x: f64, y: f64) -> PointIterator {
-    line_point_iterator(current, abs, x, y, MoveType::Fly)
-}
-
-fn line_to(current: &Point, abs: bool, x: f64, y: f64) -> PointIterator {
-    line_point_iterator(current, abs, x, y, MoveType::Draw)
+fn line_to(current: &Point, abs: bool, x: f64, y: f64) -> LinePointIterator {
+    let end_point = absolute_point_coord(&current, abs, x, y);
+    LinePointIterator::new(end_point.x, end_point.y, MoveType::Draw)
 }
 
 fn cubic_curve_to(
@@ -253,7 +356,7 @@ fn cubic_curve_to(
     x: f64,
     y: f64,
     next_segment: PathSegment,
-) -> PointIterator {
+) -> CurvePointIterator {
     let time = BezierTick::new();
     let p1 = absolute_point_coord(&current, abs, x1, y1);
     let end_point = absolute_point_coord(&current, abs, x, y);
@@ -263,7 +366,7 @@ fn cubic_curve_to(
         point: Point { x: p2.x, y: p2.y },
     });
     let calc_formula = cubic_curve(current.x, current.y, p1, p2, end_point);
-    PointIterator {
+    CurvePointIterator {
         time,
         calc_formula,
         move_type: MoveType::Draw,
@@ -280,7 +383,7 @@ fn smooth_cubic_curve_to(
     y: f64,
     prev_support_point_opt: Option<SupportPoint>,
     next_segment: PathSegment,
-) -> PointIterator {
+) -> CurvePointIterator {
     let p1 = mirrored_point(current, abs, prev_support_point_opt, CurveType::Cubic);
     cubic_curve_to(current, abs, p1.x, p1.y, x2, y2, x, y, next_segment)
 }
@@ -293,7 +396,7 @@ fn quadratic_curve_to(
     x: f64,
     y: f64,
     next_segment: PathSegment,
-) -> PointIterator {
+) -> CurvePointIterator {
     let time = BezierTick::new();
     let p1 = absolute_point_coord(&current, abs, x1, y1);
     let end_point = absolute_point_coord(&current, abs, x, y);
@@ -302,7 +405,7 @@ fn quadratic_curve_to(
         point: Point { x: p1.x, y: p1.y },
     });
     let calc_formula = square_curve(current.x, current.y, p1, end_point);
-    PointIterator {
+    CurvePointIterator {
         time,
         calc_formula,
         move_type: MoveType::Draw,
@@ -317,7 +420,7 @@ fn smooth_quadratic_curve_to(
     y: f64,
     prev_support_point_opt: Option<SupportPoint>,
     next_segment: PathSegment,
-) -> PointIterator {
+) -> CurvePointIterator {
     let p1 = mirrored_point(current, abs, prev_support_point_opt, CurveType::Quadratic);
     quadratic_curve_to(current, abs, p1.x, p1.y, x, y, next_segment)
 }
@@ -328,14 +431,16 @@ fn ellipse_curve_to(
     rx: f64,
     ry: f64,
     x_axis_rotation: f64,
-) -> PointIterator {
+    end_x: f64,
+    end_y: f64,
+) -> EllipsePointIterator {
     let time = BezierTick::new();
-    let calc_formula = ellipse_curve(current.x, current.y, rx, ry, x_axis_rotation);
-    PointIterator {
+    let calc_formula = ellipse_curve(current.x, current.y, rx, ry, x_axis_rotation, end_x, end_y);
+    EllipsePointIterator {
         time,
         calc_formula,
-        move_type: MoveType::Draw,
-        support_point: None,
+        end_x,
+        end_y,
     }
 }
 

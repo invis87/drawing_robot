@@ -9,16 +9,22 @@ use skulpin::VirtualKeyCode;
 use skulpin::{AppHandler, CoordinateSystem};
 use std::ffi::CString;
 
-use drawing_robot::bezier::{calc_point_iterator, MoveType, Point, SupportPoint};
+use drawing_robot::bezier::{calc_point_iterator, MoveType, Point, PointIterator, SupportPoint};
+use std::any::Any;
 use std::collections::LinkedList;
 
-fn points_to_draw() -> LinkedList<Point> {
+fn points_to_draw() -> LinkedList<Box<dyn PointIterator>> {
     let start_point = Point { x: 0., y: 0. };
     let svg_string =
-        "M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80 M10 280 Q 52.5 210, 95 280 T 180 280 T 250 280 M10 380 H 100 T 250 380 M10 480 Q 50 100, 95 480 S 150 550, 130 480";
+//    "M 10,30 A 20,20 0,0,1 50,30 A 20,20 0,0,1 90,30 Q 90,60 50,90 Q 10,60 10,30"; // heart
+//    "M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80 M10 280 Q 52.5 210, 95 280 T 180 280 T 250 280 M10 380 H 100 T 250 380 M10 480 Q 50 100, 95 480 S 150 550, 130 450";
+//    "M 110 215 A 36 60 0 0 0 150.71 170.29 M 110 215 A 36 60 0 0 1 150.71 170.29 M 110 215 A 36 60 0 1 0 150.71 170.29 M 110 215 A 36 60 0 1 1 150.71 170.29"; // 4 curves that creates 2 ellipses
+
+      "M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80 M10 280 Q 52.5 210, 95 280 T 180 280 T 250 280 M10 380 H 100 T 250 380 M10 480 Q 50 100, 95 480 S 150 550, 130 450 M10 680 A 30 50 0 0 1 62 627 L 80 630 A 30 50 -45 0 1 115 574";
+    //        "M10 80 l 100 200 L 210 80";
     let path_parser = svgtypes::PathParser::from(svg_string);
 
-    let mut points: LinkedList<Point> = LinkedList::new();
+    let mut point_iterators: LinkedList<Box<dyn PointIterator>> = LinkedList::new();
     let mut current_point = start_point;
     let mut prev_support_point_opt: Option<SupportPoint> = None;
     for token in path_parser {
@@ -27,15 +33,11 @@ fn points_to_draw() -> LinkedList<Point> {
                 calc_point_iterator(current_point, path_segment, prev_support_point_opt);
             prev_support_point_opt = point_iterator.get_support_point();
             current_point = point_iterator.get_end_position();
-            if (point_iterator.move_type != MoveType::Fly) {
-                for point in point_iterator {
-                    points.push_back(point);
-                }
-            }
+            point_iterators.push_back(point_iterator);
         }
     }
 
-    points
+    point_iterators
 }
 
 fn main() {
@@ -99,12 +101,28 @@ impl AppHandler for ExampleApp {
         paint.set_stroke_width(2.0);
 
         // Draw SVG
-        let points = points_to_draw();
-        for point in points {
-            canvas.draw_point(
-                skia_safe::Point::new(point.x as f32, point.y as f32),
-                &paint,
-            );
+        let points_iterator = points_to_draw();
+        let mut prev_init = false;
+        let mut prev_point: Point = Point { x: 0.0, y: 0.0 };
+        for points in points_iterator {
+            let current_move_type = *points.move_type();
+            for point in points {
+                if !prev_init {
+                    prev_init = true;
+                    prev_point = point;
+                } else {
+                    if current_move_type != MoveType::Fly {
+                        canvas.draw_line(
+                            skia_safe::Point::new(prev_point.x as f32, prev_point.y as f32),
+                            skia_safe::Point::new(point.x as f32, point.y as f32),
+                            &paint,
+                        );
+                        prev_point = point;
+                    } else {
+                        prev_init = false;
+                    }
+                }
+            }
         }
     }
 
