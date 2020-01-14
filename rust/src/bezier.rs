@@ -480,7 +480,7 @@ fn mirrored_point(
     curve_type: CurveType,
 ) -> Point {
     let mut mirrored_point = match prev_support_point_opt {
-        Some(prev_support_point) if path_command_condition(&prev_support_point, curve_type) => {
+        Some(ref prev_support_point) if path_command_condition(prev_support_point, curve_type) => {
             let mirrored_x = current.x - prev_support_point.point.x;
             let mirrored_y = current.y - prev_support_point.point.y;
             Point {
