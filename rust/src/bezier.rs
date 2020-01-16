@@ -36,6 +36,35 @@ impl Iterator for BezierTick {
     }
 }
 
+struct CircleTick {
+    pub value: f64,
+    pub direction: bool,
+    pub end: f64,
+}
+
+impl CircleTick {
+    const TICK_PERIOD: f64 = 0.001;
+
+    fn new(start: f64, end: f64, direction: bool) -> CircleTick {
+        CircleTick { value: start, end, direction }
+    }
+}
+
+impl Iterator for CircleTick {
+    type Item = f64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let multiplier = if(self.direction) {1.} else {-1.};
+        if (self.value > self.end * multiplier) {
+            None
+        } else {
+            let current_value = self.value;
+            self.value += CircleTick::TICK_PERIOD * multiplier;
+            Some(current_value)
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Point {
     pub x: f64,
@@ -141,7 +170,9 @@ impl PointIterator for CurvePointIterator {
 }
 
 pub struct EllipsePointIterator {
-    time: BezierTick,
+    start_x: f64,
+    start_y: f64,
+    time: CircleTick,
     calc_formula: Box<dyn Fn(f64) -> Point>,
     end_x: f64,
     end_y: f64,
@@ -219,7 +250,7 @@ fn cubic_curve(
 const PI: f64 = 3.14159265358979323846264338327950288_f64;
 
 fn map_to_part_of_circle(time: f64) -> f64 {
-    time / 1.0 * 2.0 * PI
+    time * 2.0 * PI
 }
 
 fn ellipse_curve(
@@ -233,13 +264,37 @@ fn ellipse_curve(
 ) -> Box<dyn Fn(f64) -> Point> {
     Box::new(move |t: f64| {
         let x_rad_rotation: f64 = x_axis_rotation * PI / 180.0;
-        let circle_time = map_to_part_of_circle(t);
+//        let circle_time = map_to_part_of_circle(t);
+        let circle_time = t;
 
         let x = rx * circle_time.cos();
         let y = ry * circle_time.sin();
 
         let x_after_rotation = start_x + x * x_rad_rotation.cos() - y * x_rad_rotation.sin();
         let y_after_rotation = start_y + x * x_rad_rotation.sin() + y * x_rad_rotation.cos();
+
+
+//        start_x + x * x_rad_rotation.cos() - y * x_rad_rotation.sin() = start_x
+//        x * x_rad_rotation.cos() - y * x_rad_rotation.sin() = 0
+//        x * x_rad_rotation.cos() = y * x_rad_rotation.sin()
+//        y / x = x_rad_rotation.cos() / x_rad_rotation.sin()
+//        circle_time.sin() / circle_time.cos()  = x_rad_rotation.cos() / x_rad_rotation.sin() / (ry / rx)
+//        circle_time.tan() = x_rad_rotation.cos() / x_rad_rotation.sin() / (ry / rx)
+//        (time * 2.0 * PI).tan() = x_rad_rotation.cos() / x_rad_rotation.sin() / (ry / rx)
+//        (time * 2.0 * PI) = (x_rad_rotation.cos() / x_rad_rotation.sin() / (ry / rx)).arctan
+//        time = (x_rad_rotation.cos() / x_rad_rotation.sin() / (ry / rx)).atan() / ( 2.0 * PI )
+
+
+//        start_x + x * x_rad_rotation.cos() - y * x_rad_rotation.sin() = end_x
+//        x * x_rad_rotation.cos() = end_x - start_x + y * x_rad_rotation.sin()
+//        x_rad_rotation.cos() / x_rad_rotation.sin() = (end_x - start_x) / (x * x_rad_rotation.sin() + y / x
+//        x_rad_rotation.cos() / x_rad_rotation.sin() = (end_x - start_x) / (x * x_rad_rotation.sin() + (ry * circle_time.sin() / rx * circle_time.cos())
+//        x_rad_rotation.cos() / x_rad_rotation.sin() - (end_x - start_x) / (x * x_rad_rotation.sin() = ry * circle_time.sin() / rx * circle_time.cos()
+//        (x_rad_rotation.cos() / x_rad_rotation.sin() - (end_x - start_x) / (x * x_rad_rotation.sin()) * rx / ry = circle_time.sin() / circle_time.cos()
+//        (x_rad_rotation.cos() / x_rad_rotation.sin() - (end_x - start_x) / (x * x_rad_rotation.sin()) * rx / ry = circle_time.tan()
+//        ((x_rad_rotation.cos() / x_rad_rotation.sin() - (end_x - start_x) / (x * x_rad_rotation.sin()) * rx / ry)).atan() = time
+
+
 
         Point {
             x: x_after_rotation,
@@ -434,14 +489,52 @@ fn ellipse_curve_to(
     end_x: f64,
     end_y: f64,
 ) -> EllipsePointIterator {
-    let time = BezierTick::new();
+
+
+
+
+
+    let x_rad_rotation: f64 = x_axis_rotation * PI / 180.0;
+    let start_time = (x_rad_rotation.cos() / x_rad_rotation.sin() * rx / ry).atan();
+
+    let rx_sqr = sqr(rx);
+    let ry_sqr = sqr(ry);
+    let cos_rotation_sqr = sqr(x_rad_rotation.cos());
+    let sin_rotation_sqr = sqr(x_rad_rotation.sin());
+    let sqrt_sum_a2_plus_b2 = (rx_sqr * cos_rotation_sqr + ry_sqr * sin_rotation_sqr).sqrt(); //sqrt(a^2 + b^2)
+    println!("sqrt_sum_a2_plus_b2 = {:?}", sqrt_sum_a2_plus_b2);
+
+    println!("end_x = {:?}, current.x = {:?}, end_x - current.x = {:?}", end_x, current.x, end_x - current.x);
+    let first_part = ((end_x - current.x) / sqrt_sum_a2_plus_b2).acos();
+    println!("first_part = {:?}", first_part);
+
+    let second_part = ((rx * x_rad_rotation.cos()) / sqrt_sum_a2_plus_b2).acos();
+    println!("second_part = {:?}", second_part);
+
+
+    let end_time = first_part - second_part;
+    println!("end_time = {:?}", end_time);
+//    let end_time = 1. * PI * 2.;
+//    let eeee = ((x_rad_rotation.cos() / x_rad_rotation.sin() - (end_x - current.x) / (x * x_rad_rotation.sin()) * rx / ry)).atan();
+
+
+    let time = CircleTick::new(start_time, end_time, true);
+
+
     let calc_formula = ellipse_curve(current.x, current.y, rx, ry, x_axis_rotation, end_x, end_y);
     EllipsePointIterator {
+        start_x: current.x,
+        start_y: current.y,
         time,
         calc_formula,
         end_x,
         end_y,
     }
+}
+
+#[inline(always)]
+fn sqr(x: f64) -> f64 {
+    x * x
 }
 
 fn absolute_point_coord(start: &Point, abs: bool, x: f64, y: f64) -> Point {
