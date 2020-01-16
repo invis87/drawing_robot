@@ -2,3 +2,7 @@
 CMakeListsPrivate.txt
 rust/.idea
 rust/Cargo.lock
+rust/.DS_Store
+rust/target
+.DS_Store
+.idea/
