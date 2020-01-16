@@ -179,16 +179,29 @@ impl Iterator for dyn PointIterator {
     }
 }
 
+pub fn points_from_path_segments<'a>(path_segments: Box<dyn Iterator<Item=PathSegment>>) -> Box<dyn Iterator<Item = Box<dyn PointIterator + 'a>>> {
+    let mut current_point = Point {x: 0., y: 0.};
+    let mut prev_support_point_opt: Option<SupportPoint> = None;
+
+    Box::new(path_segments.map(move |path_segment| {
+        let point_iterator =
+            calc_point_iterator(&current_point, path_segment, &prev_support_point_opt);
+        prev_support_point_opt = point_iterator.get_support_point();
+        current_point = point_iterator.get_end_position();
+        point_iterator
+    }).into_iter())
+}
+
 pub fn calc_point_iterator(
-    current: Point,
+    current: &Point,
     next_segment: PathSegment,
-    prev_support_point_opt: Option<SupportPoint>,
+    prev_support_point_opt: &Option<SupportPoint>,
 ) -> Box<dyn PointIterator> {
     match next_segment {
-        PathSegment::MoveTo { abs, x, y } => Box::new(move_to(&current, abs, x, y)),
-        PathSegment::LineTo { abs, x, y } => Box::new(line_to(&current, abs, x, y)),
-        PathSegment::HorizontalLineTo { abs, x } => Box::new(line_to(&current, abs, x, current.y)),
-        PathSegment::VerticalLineTo { abs, y } => Box::new(line_to(&current, abs, current.x, y)),
+        PathSegment::MoveTo { abs, x, y } => Box::new(move_to(current, abs, x, y)),
+        PathSegment::LineTo { abs, x, y } => Box::new(line_to(current, abs, x, y)),
+        PathSegment::HorizontalLineTo { abs, x } => Box::new(line_to(current, abs, x, current.y)),
+        PathSegment::VerticalLineTo { abs, y } => Box::new(line_to(current, abs, current.x, y)),
         PathSegment::CurveTo {
             abs,
             x1,
@@ -197,9 +210,9 @@ pub fn calc_point_iterator(
             y2,
             x,
             y,
-        } => cubic_curve_to(&current, abs, x1, y1, x2, y2, x, y, next_segment),
+        } => cubic_curve_to(current, abs, x1, y1, x2, y2, x, y, next_segment),
         PathSegment::SmoothCurveTo { abs, x2, y2, x, y } => smooth_cubic_curve_to(
-            &current,
+            current,
             abs,
             x2,
             y2,
@@ -209,10 +222,10 @@ pub fn calc_point_iterator(
             next_segment,
         ),
         PathSegment::Quadratic { abs, x1, y1, x, y } => {
-            quadratic_curve_to(&current, abs, x1, y1, x, y, next_segment)
+            quadratic_curve_to(current, abs, x1, y1, x, y, next_segment)
         }
         PathSegment::SmoothQuadratic { abs, x, y } => {
-            smooth_quadratic_curve_to(&current, abs, x, y, prev_support_point_opt, next_segment)
+            smooth_quadratic_curve_to(current, abs, x, y, prev_support_point_opt, next_segment)
         }
         PathSegment::EllipticalArc {
             abs,
@@ -224,7 +237,7 @@ pub fn calc_point_iterator(
             x,
             y,
         } => ellipse_curve_to(
-            &current,
+            current,
             abs,
             rx,
             ry,
@@ -289,7 +302,7 @@ fn smooth_cubic_curve_to(
     y2: f64,
     x: f64,
     y: f64,
-    prev_support_point_opt: Option<SupportPoint>,
+    prev_support_point_opt: &Option<SupportPoint>,
     next_segment: PathSegment,
 ) -> Box<dyn PointIterator> {
     let p1 = mirrored_point(current, abs, prev_support_point_opt, CurveType::Cubic);
@@ -326,7 +339,7 @@ fn smooth_quadratic_curve_to(
     abs: bool,
     x: f64,
     y: f64,
-    prev_support_point_opt: Option<SupportPoint>,
+    prev_support_point_opt: &Option<SupportPoint>,
     next_segment: PathSegment,
 ) -> Box<dyn PointIterator> {
     let p1 = mirrored_point(current, abs, prev_support_point_opt, CurveType::Quadratic);
@@ -422,7 +435,7 @@ fn path_command_condition(prev_support_point: &SupportPoint, curve_type: CurveTy
 fn mirrored_point(
     current: &Point,
     abs: bool,
-    prev_support_point_opt: Option<SupportPoint>,
+    prev_support_point_opt: &Option<SupportPoint>,
     curve_type: CurveType,
 ) -> Point {
     let mut mirrored_point = match prev_support_point_opt {

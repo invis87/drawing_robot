@@ -9,13 +9,11 @@ use skulpin::VirtualKeyCode;
 use skulpin::{AppHandler, CoordinateSystem};
 use std::ffi::CString;
 
-use drawing_robot::svg::svg_curve::{
-    calc_point_iterator, MoveType, Point, PointIterator, SupportPoint,
-};
+use drawing_robot::svg::svg_curve::{calc_point_iterator, MoveType, Point, PointIterator, SupportPoint, points_from_path_segments};
 use std::collections::LinkedList;
+use svgtypes::PathSegment;
 
-fn points_to_draw() -> LinkedList<Box<dyn PointIterator>> {
-    let start_point = Point { x: 0., y: 0. };
+fn points_to_draw() -> Box<dyn Iterator<Item = Box<dyn PointIterator>>> {
     let svg_string =
 //    "M 10,30 A 20,20 0,0,1 50,30 A 20,20 0,0,1 90,30 Q 90,60 50,90 Q 10,60 10,30"; // heart
 //    "M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80 M10 280 Q 52.5 210, 95 280 T 180 280 T 250 280 M10 380 H 100 T 250 380 M10 480 Q 50 100, 95 480 S 150 550, 130 450";
@@ -24,21 +22,9 @@ fn points_to_draw() -> LinkedList<Box<dyn PointIterator>> {
       "M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80 M10 280 Q 52.5 210, 95 280 T 180 280 T 250 280 M10 380 H 100 T 250 380 M10 480 Q 50 100, 95 480 S 150 550, 130 450 M10 680 A 30 50 0 0 1 62 627 L 80 630 A 3 5 -45 0 1 415 650";
     //        "M10 80 l 100 200 L 210 80";
     let path_parser = svgtypes::PathParser::from(svg_string);
+    let path_segments = Box::new(path_parser.filter_map(Result::ok).into_iter());
 
-    let mut point_iterators: LinkedList<Box<dyn PointIterator>> = LinkedList::new();
-    let mut current_point = start_point;
-    let mut prev_support_point_opt: Option<SupportPoint> = None;
-    for token in path_parser {
-        if let Ok(path_segment) = token {
-            let point_iterator =
-                calc_point_iterator(current_point, path_segment, prev_support_point_opt);
-            prev_support_point_opt = point_iterator.get_support_point();
-            current_point = point_iterator.get_end_position();
-            point_iterators.push_back(point_iterator);
-        }
-    }
-
-    point_iterators
+    points_from_path_segments(path_segments)
 }
 
 fn main() {
