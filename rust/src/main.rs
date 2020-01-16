@@ -1,4 +1,4 @@
-use drawing_robot::bezier::{calc_point_iterator, Point};
+use drawing_robot::svg_curve::{calc_point_iterator, Point};
 use svgtypes::PathSegment;
 
 fn main() {

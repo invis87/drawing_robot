@@ -10,19 +10,19 @@ pub enum MoveType {
     Ellipse,
 }
 
-struct BezierTick {
+struct TickTimer {
     pub time: f64,
 }
 
-impl BezierTick {
+impl TickTimer {
     const TICK_PERIOD: f64 = 0.001; //todo: number of ticks should be calculated based on curve length
 
-    fn new() -> BezierTick {
-        BezierTick { time: 0.0 }
+    fn new() -> TickTimer {
+        TickTimer { time: 0.0 }
     }
 }
 
-impl Iterator for BezierTick {
+impl Iterator for TickTimer {
     type Item = f64;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -30,7 +30,7 @@ impl Iterator for BezierTick {
             None
         } else {
             let current_value = self.time;
-            self.time += BezierTick::TICK_PERIOD;
+            self.time += TickTimer::TICK_PERIOD;
             Some(current_value)
         }
     }
@@ -54,6 +54,32 @@ pub trait PointIterator {
     fn move_type(&self) -> &MoveType;
 
     fn next(&mut self) -> Option<Point>;
+}
+
+pub struct EmptyPointIterator {
+    end_x: f64,
+    end_y: f64,
+}
+
+impl PointIterator for EmptyPointIterator {
+    fn get_support_point(&self) -> Option<SupportPoint> {
+        None
+    }
+
+    fn get_end_position(&self) -> Point {
+        Point {
+            x: self.end_x,
+            y: self.end_y,
+        }
+    }
+
+    fn move_type(&self) -> &MoveType {
+        &MoveType::Fly
+    }
+
+    fn next(&mut self) -> Option<Point> {
+        None
+    }
 }
 
 pub struct LinePointIterator {
@@ -104,7 +130,7 @@ impl PointIterator for LinePointIterator {
 }
 
 pub struct CurvePointIterator {
-    time: BezierTick,
+    time: TickTimer,
     calc_formula: Box<dyn Fn(f64) -> Point>,
     move_type: MoveType,
     support_point: Option<SupportPoint>,
@@ -141,7 +167,7 @@ impl PointIterator for CurvePointIterator {
 }
 
 pub struct EllipsePointIterator {
-    time: BezierTick,
+    time: TickTimer,
     calc_formula: Box<dyn Fn(f64) -> Point>,
     end_x: f64,
     end_y: f64,
@@ -218,34 +244,40 @@ fn cubic_curve(
 
 const PI: f64 = 3.14159265358979323846264338327950288_f64;
 
-fn map_to_part_of_circle(time: f64) -> f64 {
-    time / 1.0 * 2.0 * PI
-}
-
 fn ellipse_curve(
-    start_x: f64,
-    start_y: f64,
-    rx: f64,
-    ry: f64,
-    x_axis_rotation: f64,
-    end_x: f64,
-    end_y: f64,
+    start_angle: f64,
+    sweep_angle: f64,
+    rx_abs: f64,
+    ry_abs: f64,
+    x_rad_rotation: f64,
+    center_x: f64,
+    center_y: f64,
 ) -> Box<dyn Fn(f64) -> Point> {
     Box::new(move |t: f64| {
-        let x_rad_rotation: f64 = x_axis_rotation * PI / 180.0;
-        let circle_time = map_to_part_of_circle(t);
+        let angle = start_angle + sweep_angle * t;
+        let ellipse_component_x = rx_abs * angle.cos();
+        let ellipse_component_y = ry_abs * angle.sin();
 
-        let x = rx * circle_time.cos();
-        let y = ry * circle_time.sin();
-
-        let x_after_rotation = start_x + x * x_rad_rotation.cos() - y * x_rad_rotation.sin();
-        let y_after_rotation = start_y + x * x_rad_rotation.sin() + y * x_rad_rotation.cos();
+        let point_x = x_rad_rotation.cos() * ellipse_component_x - x_rad_rotation.sin() * ellipse_component_y + center_x;
+        let point_y = x_rad_rotation.sin() * ellipse_component_x + x_rad_rotation.cos() * ellipse_component_y + center_y;
 
         Point {
-            x: x_after_rotation,
-            y: y_after_rotation,
+            x: point_x,
+            y: point_y,
         }
     })
+}
+
+fn sqr(x: f64) -> f64 {
+    x * x
+}
+
+fn angle_between(start_x: f64, start_y: f64, end_x: f64, end_y: f64) -> f64 {
+    let p = start_x * end_x + start_y * end_y;
+    let n = ((sqr(start_x) + sqr(start_y)) * (sqr(end_x) + sqr(end_y))).sqrt();
+    let sign = if start_x * end_y - start_y * end_x < 0. { -1.} else {1.};
+    let angle = sign * (p/n).acos();
+    return angle;
 }
 
 pub fn calc_point_iterator(
@@ -313,19 +345,21 @@ pub fn calc_point_iterator(
             sweep,
             x,
             y,
-        } => Box::new(ellipse_curve_to(
+        } => ellipse_curve_to(
             &current,
             abs,
             rx,
             ry,
             x_axis_rotation,
+            large_arc,
+            sweep,
             x,
             y,
-        )),
+        ),
         //        PathSegment::ClosePath{abs} => ()
         _ => {
             //todo: remove me
-            let time = BezierTick::new();
+            let time = TickTimer::new();
             let end_point = absolute_point_coord(&current, true, 20., 33.);
             Box::new(LinePointIterator::new(
                 end_point.x,
@@ -357,7 +391,7 @@ fn cubic_curve_to(
     y: f64,
     next_segment: PathSegment,
 ) -> CurvePointIterator {
-    let time = BezierTick::new();
+    let time = TickTimer::new();
     let p1 = absolute_point_coord(&current, abs, x1, y1);
     let end_point = absolute_point_coord(&current, abs, x, y);
     let p2 = absolute_point_coord(&current, abs, x2, y2);
@@ -397,7 +431,7 @@ fn quadratic_curve_to(
     y: f64,
     next_segment: PathSegment,
 ) -> CurvePointIterator {
-    let time = BezierTick::new();
+    let time = TickTimer::new();
     let p1 = absolute_point_coord(&current, abs, x1, y1);
     let end_point = absolute_point_coord(&current, abs, x, y);
     let support_point = Some(SupportPoint {
@@ -431,17 +465,82 @@ fn ellipse_curve_to(
     rx: f64,
     ry: f64,
     x_axis_rotation: f64,
+    large_arc: bool,
+    sweep: bool,
     end_x: f64,
     end_y: f64,
-) -> EllipsePointIterator {
-    let time = BezierTick::new();
-    let calc_formula = ellipse_curve(current.x, current.y, rx, ry, x_axis_rotation, end_x, end_y);
-    EllipsePointIterator {
+) -> Box<dyn PointIterator> {
+    let time = TickTimer::new();
+
+    //calculations from: https://github.com/MadLittleMods/svg-curve-lib/
+
+    // If the endpoints are identical, then this is equivalent to omitting the elliptical arc segment entirely.
+    if(current.x == end_x && current.y == end_y) {
+        return Box::new(EmptyPointIterator{end_x, end_y})
+    }
+
+    // If rx = 0 or ry = 0 then this arc is treated as a straight line segment joining the endpoints.
+    if(rx == 0. || ry == 0.) {
+        return Box::new(line_to(current, abs, end_x, end_y));
+    }
+
+    let start_x = current.x;
+    let start_y = current.y;
+
+    let mut rx_abs = rx.abs();
+    let mut ry_abs = ry.abs();
+    let x_axis_rotation_mod_360 = x_axis_rotation % 360.0;
+    let x_rad_rotation: f64 = x_axis_rotation_mod_360 * PI / 180.0;
+
+    let dx = (start_x - end_x) / 2.;
+    let dy = (start_y - end_y) / 2.;
+
+    // Step #1: Compute transformedPoint
+    let dx_rotated = x_rad_rotation.cos() * dx + x_rad_rotation.sin() * dy;
+    let dy_rotated = -x_rad_rotation.sin() * dx + x_rad_rotation.cos() * dy;
+
+    let radii_check = sqr(dx_rotated) / sqr(rx_abs) + sqr(dy_rotated) / sqr(ry_abs);
+    if radii_check > 1.0 {
+        rx_abs = radii_check.sqrt() * rx_abs;
+        ry_abs = radii_check.sqrt() * ry_abs;
+    }
+
+    // Step #2: Compute transformedCenter
+    let center_square_numerator = sqr(rx_abs) * sqr(ry_abs) - sqr(rx_abs) * sqr(dy_rotated) - sqr(ry_abs) * sqr(dx_rotated);
+    let center_square_root_denom = sqr(rx_abs) * sqr(dy_rotated) + sqr(ry_abs) * sqr(dx_rotated);
+    let mut center_radicand = center_square_numerator / center_square_root_denom;
+    if(center_radicand < 0.) { center_radicand = 0. };
+
+    let center_coef = if(large_arc != sweep) { 1. * center_radicand.sqrt()} else { -1. * center_radicand.sqrt()};
+    let center_x_rotated = center_coef * (rx_abs * dy_rotated / ry_abs);
+    let center_y_rotated = center_coef * (-ry_abs * dx_rotated / rx_abs);
+
+    // Step #3: Compute center
+    let center_x = x_rad_rotation.cos() * center_x_rotated - x_rad_rotation.sin() * center_y_rotated + ((start_x + end_x) / 2.);
+    let center_y = x_rad_rotation.sin() * center_x_rotated + x_rad_rotation.cos() * center_y_rotated + ((start_y + end_y) / 2.);
+
+    // Step #4: Compute start/sweep angles
+    let start_vector_x = (dx_rotated - center_x_rotated) / rx_abs;
+    let start_vector_y = (dy_rotated - center_y_rotated) / ry_abs;
+    let start_angle = angle_between(1., 0., start_vector_x, start_vector_y);
+
+    let end_vector_x = (-dx_rotated - center_x_rotated) / rx_abs;
+    let end_vector_y = (-dy_rotated - center_y_rotated) / ry_abs;
+    let mut sweep_angle = angle_between(start_vector_x, start_vector_y, end_vector_x, end_vector_y);
+    if(!sweep && sweep_angle > 0.) {
+        sweep_angle -= 2. * PI;
+    } else if (sweep && sweep_angle < 0.) {
+        sweep_angle += 2. * PI;
+    }
+    sweep_angle = sweep_angle % (2. * PI);
+
+    let calc_formula = ellipse_curve(start_angle, sweep_angle, rx_abs, ry_abs, x_rad_rotation, center_x, center_y);
+    Box::new(EllipsePointIterator {
         time,
         calc_formula,
         end_x,
         end_y,
-    }
+    })
 }
 
 fn absolute_point_coord(start: &Point, abs: bool, x: f64, y: f64) -> Point {

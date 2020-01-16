@@ -1,3 +1,3 @@
 #![allow(unused_parens)]
 
-pub mod bezier;
+pub mod svg_curve;

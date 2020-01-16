@@ -9,8 +9,7 @@ use skulpin::VirtualKeyCode;
 use skulpin::{AppHandler, CoordinateSystem};
 use std::ffi::CString;
 
-use drawing_robot::bezier::{calc_point_iterator, MoveType, Point, PointIterator, SupportPoint};
-use std::any::Any;
+use drawing_robot::svg_curve::{calc_point_iterator, MoveType, Point, PointIterator, SupportPoint};
 use std::collections::LinkedList;
 
 fn points_to_draw() -> LinkedList<Box<dyn PointIterator>> {
@@ -20,7 +19,7 @@ fn points_to_draw() -> LinkedList<Box<dyn PointIterator>> {
 //    "M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80 M10 280 Q 52.5 210, 95 280 T 180 280 T 250 280 M10 380 H 100 T 250 380 M10 480 Q 50 100, 95 480 S 150 550, 130 450";
 //    "M 110 215 A 36 60 0 0 0 150.71 170.29 M 110 215 A 36 60 0 0 1 150.71 170.29 M 110 215 A 36 60 0 1 0 150.71 170.29 M 110 215 A 36 60 0 1 1 150.71 170.29"; // 4 curves that creates 2 ellipses
 
-      "M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80 M10 280 Q 52.5 210, 95 280 T 180 280 T 250 280 M10 380 H 100 T 250 380 M10 480 Q 50 100, 95 480 S 150 550, 130 450 M10 680 A 30 50 0 0 1 62 627 L 80 630 A 30 50 -45 0 1 115 574";
+      "M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80 M10 280 Q 52.5 210, 95 280 T 180 280 T 250 280 M10 380 H 100 T 250 380 M10 480 Q 50 100, 95 480 S 150 550, 130 450 M10 680 A 30 50 0 0 1 62 627 L 80 630 A 3 5 -45 0 1 415 650";
     //        "M10 80 l 100 200 L 210 80";
     let path_parser = svgtypes::PathParser::from(svg_string);
 
