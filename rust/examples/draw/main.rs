@@ -9,7 +9,9 @@ use skulpin::VirtualKeyCode;
 use skulpin::{AppHandler, CoordinateSystem};
 use std::ffi::CString;
 
-use drawing_robot::svg_curve::{calc_point_iterator, MoveType, Point, PointIterator, SupportPoint};
+use drawing_robot::svg::svg_curve::{
+    calc_point_iterator, MoveType, Point, PointIterator, SupportPoint,
+};
 use std::collections::LinkedList;
 
 fn points_to_draw() -> LinkedList<Box<dyn PointIterator>> {

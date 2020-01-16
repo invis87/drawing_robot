@@ -1,38 +1,13 @@
 use svgtypes::{PathCommand, PathSegment};
 
+use super::math::*;
+use super::tick_timer::TickTimer;
+
 #[derive(PartialEq, Copy, Clone)]
 pub enum MoveType {
     Fly,
     Draw,
     Erase,
-}
-
-struct TickTimer {
-    pub time: f64,
-}
-
-impl Default for TickTimer {
-    fn default() -> Self {
-        TickTimer { time: 0.0 }
-    }
-}
-
-impl TickTimer {
-    const TICK_PERIOD: f64 = 0.001; //todo: number of ticks should be calculated based on curve length
-}
-
-impl Iterator for TickTimer {
-    type Item = f64;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if (self.time > 1.0) {
-            None
-        } else {
-            let current_value = self.time;
-            self.time += TickTimer::TICK_PERIOD;
-            Some(current_value)
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -55,7 +30,7 @@ pub trait PointIterator {
     fn next(&mut self) -> Option<Point>;
 }
 
-pub struct EmptyPointIterator {
+struct EmptyPointIterator {
     end_x: f64,
     end_y: f64,
 }
@@ -81,7 +56,7 @@ impl PointIterator for EmptyPointIterator {
     }
 }
 
-pub struct LinePointIterator {
+struct LinePointIterator {
     end_x: f64,
     end_y: f64,
     move_type: MoveType,
@@ -128,7 +103,7 @@ impl PointIterator for LinePointIterator {
     }
 }
 
-pub struct CurvePointIterator<F: Fn(f64) -> Point> {
+struct CurvePointIterator<F: Fn(f64) -> Point> {
     time: TickTimer,
     calc_formula: F,
     move_type: MoveType,
@@ -165,7 +140,7 @@ impl<F: Fn(f64) -> Point> PointIterator for CurvePointIterator<F> {
     }
 }
 
-pub struct EllipsePointIterator<F: Fn(f64) -> Point> {
+struct EllipsePointIterator<F: Fn(f64) -> Point> {
     time: TickTimer,
     calc_formula: F,
     end_x: f64,
@@ -204,80 +179,6 @@ impl Iterator for dyn PointIterator {
     }
 }
 
-fn square_curve(start_x: f64, start_y: f64, p1: Point, end: Point) -> Box<dyn Fn(f64) -> Point> {
-    Box::new(move |t: f64| {
-        let diff = 1. - t;
-        let square_t = t * t;
-        let square_diff = diff * diff;
-        let x = start_x * square_diff + p1.x * 2. * t * diff + end.x * square_t;
-        let y = start_y * square_diff + p1.y * 2. * t * diff + end.y * square_t;
-        Point { x, y }
-    })
-}
-
-fn cubic_curve(
-    start_x: f64,
-    start_y: f64,
-    p1: Point,
-    p2: Point,
-    end: Point,
-) -> Box<dyn Fn(f64) -> Point> {
-    Box::new(move |t: f64| {
-        let diff = 1. - t;
-        let square_t = t * t;
-        let cube_t = square_t * t;
-        let square_diff = diff * diff;
-        let cube_diff = square_diff * diff;
-        let x = start_x * cube_diff
-            + p1.x * 3. * t * square_diff
-            + p2.x * 3. * square_t * diff
-            + end.x * cube_t;
-        let y = start_y * cube_diff
-            + p1.y * 3. * t * square_diff
-            + p2.y * 3. * square_t * diff
-            + end.y * cube_t;
-        Point { x, y }
-    })
-}
-
-const PI: f64 = 3.14159265358979323846264338327950288_f64;
-
-fn ellipse_curve(
-    start_angle: f64,
-    sweep_angle: f64,
-    rx_abs: f64,
-    ry_abs: f64,
-    x_rad_rotation: f64,
-    center_x: f64,
-    center_y: f64,
-) -> Box<dyn Fn(f64) -> Point> {
-    Box::new(move |t: f64| {
-        let angle = start_angle + sweep_angle * t;
-        let ellipse_component_x = rx_abs * angle.cos();
-        let ellipse_component_y = ry_abs * angle.sin();
-
-        let point_x = x_rad_rotation.cos() * ellipse_component_x - x_rad_rotation.sin() * ellipse_component_y + center_x;
-        let point_y = x_rad_rotation.sin() * ellipse_component_x + x_rad_rotation.cos() * ellipse_component_y + center_y;
-
-        Point {
-            x: point_x,
-            y: point_y,
-        }
-    })
-}
-
-fn sqr(x: f64) -> f64 {
-    x * x
-}
-
-fn angle_between(start_x: f64, start_y: f64, end_x: f64, end_y: f64) -> f64 {
-    let p = start_x * end_x + start_y * end_y;
-    let n = ((sqr(start_x) + sqr(start_y)) * (sqr(end_x) + sqr(end_y))).sqrt();
-    let sign = if start_x * end_y - start_y * end_x < 0. { -1.} else {1.};
-    let angle = sign * (p/n).acos();
-    return angle;
-}
-
 pub fn calc_point_iterator(
     current: Point,
     next_segment: PathSegment,
@@ -296,17 +197,7 @@ pub fn calc_point_iterator(
             y2,
             x,
             y,
-        } => cubic_curve_to(
-            &current,
-            abs,
-            x1,
-            y1,
-            x2,
-            y2,
-            x,
-            y,
-            next_segment,
-        ),
+        } => cubic_curve_to(&current, abs, x1, y1, x2, y2, x, y, next_segment),
         PathSegment::SmoothCurveTo { abs, x2, y2, x, y } => smooth_cubic_curve_to(
             &current,
             abs,
@@ -317,23 +208,12 @@ pub fn calc_point_iterator(
             prev_support_point_opt,
             next_segment,
         ),
-        PathSegment::Quadratic { abs, x1, y1, x, y } => quadratic_curve_to(
-            &current,
-            abs,
-            x1,
-            y1,
-            x,
-            y,
-            next_segment,
-        ),
-        PathSegment::SmoothQuadratic { abs, x, y } => smooth_quadratic_curve_to(
-            &current,
-            abs,
-            x,
-            y,
-            prev_support_point_opt,
-            next_segment,
-        ),
+        PathSegment::Quadratic { abs, x1, y1, x, y } => {
+            quadratic_curve_to(&current, abs, x1, y1, x, y, next_segment)
+        }
+        PathSegment::SmoothQuadratic { abs, x, y } => {
+            smooth_quadratic_curve_to(&current, abs, x, y, prev_support_point_opt, next_segment)
+        }
         PathSegment::EllipticalArc {
             abs,
             rx,
@@ -354,10 +234,13 @@ pub fn calc_point_iterator(
             x,
             y,
         ),
-        PathSegment::ClosePath{abs: _} => {
+        PathSegment::ClosePath { abs: _ } => {
             //todo: implement me
-            return Box::new(EmptyPointIterator{end_x: 0., end_y: 0.})
-        },
+            return Box::new(EmptyPointIterator {
+                end_x: 0.,
+                end_y: 0.,
+            });
+        }
     }
 }
 
@@ -463,74 +346,47 @@ fn ellipse_curve_to(
 ) -> Box<dyn PointIterator> {
     let time: TickTimer = Default::default();
 
-    //calculations from: https://github.com/MadLittleMods/svg-curve-lib/
+    let end_point = absolute_point_coord(&current, abs, end_x, end_y);
 
     // If the endpoints are identical, then this is equivalent to omitting the elliptical arc segment entirely.
-    if(current.x == end_x && current.y == end_y) {
-        return Box::new(EmptyPointIterator{end_x, end_y})
+    if current.x == end_point.x && current.y == end_point.y {
+        return Box::new(EmptyPointIterator {
+            end_x: end_point.x,
+            end_y: end_point.y,
+        });
     }
 
     // If rx = 0 or ry = 0 then this arc is treated as a straight line segment joining the endpoints.
-    if(rx == 0. || ry == 0.) {
+    if rx == 0. || ry == 0. {
         return Box::new(line_to(current, abs, end_x, end_y));
     }
 
-    let start_x = current.x;
-    let start_y = current.y;
+    let (start_angle, sweep_angle, rx_abs, ry_abs, x_rad_rotation, center_x, center_y) =
+        ellipse_support_calc(
+            current,
+            rx,
+            ry,
+            x_axis_rotation,
+            large_arc,
+            sweep,
+            end_point.x,
+            end_point.y,
+        );
 
-    let mut rx_abs = rx.abs();
-    let mut ry_abs = ry.abs();
-    let x_axis_rotation_mod_360 = x_axis_rotation % 360.0;
-    let x_rad_rotation: f64 = x_axis_rotation_mod_360 * PI / 180.0;
-
-    let dx = (start_x - end_x) / 2.;
-    let dy = (start_y - end_y) / 2.;
-
-    // Step #1: Compute transformedPoint
-    let dx_rotated = x_rad_rotation.cos() * dx + x_rad_rotation.sin() * dy;
-    let dy_rotated = -x_rad_rotation.sin() * dx + x_rad_rotation.cos() * dy;
-
-    let radii_check = sqr(dx_rotated) / sqr(rx_abs) + sqr(dy_rotated) / sqr(ry_abs);
-    if radii_check > 1.0 {
-        rx_abs = radii_check.sqrt() * rx_abs;
-        ry_abs = radii_check.sqrt() * ry_abs;
-    }
-
-    // Step #2: Compute transformedCenter
-    let center_square_numerator = sqr(rx_abs) * sqr(ry_abs) - sqr(rx_abs) * sqr(dy_rotated) - sqr(ry_abs) * sqr(dx_rotated);
-    let center_square_root_denom = sqr(rx_abs) * sqr(dy_rotated) + sqr(ry_abs) * sqr(dx_rotated);
-    let mut center_radicand = center_square_numerator / center_square_root_denom;
-    if(center_radicand < 0.) { center_radicand = 0. };
-
-    let center_coef = if(large_arc != sweep) { 1. * center_radicand.sqrt()} else { -1. * center_radicand.sqrt()};
-    let center_x_rotated = center_coef * (rx_abs * dy_rotated / ry_abs);
-    let center_y_rotated = center_coef * (-ry_abs * dx_rotated / rx_abs);
-
-    // Step #3: Compute center
-    let center_x = x_rad_rotation.cos() * center_x_rotated - x_rad_rotation.sin() * center_y_rotated + ((start_x + end_x) / 2.);
-    let center_y = x_rad_rotation.sin() * center_x_rotated + x_rad_rotation.cos() * center_y_rotated + ((start_y + end_y) / 2.);
-
-    // Step #4: Compute start/sweep angles
-    let start_vector_x = (dx_rotated - center_x_rotated) / rx_abs;
-    let start_vector_y = (dy_rotated - center_y_rotated) / ry_abs;
-    let start_angle = angle_between(1., 0., start_vector_x, start_vector_y);
-
-    let end_vector_x = (-dx_rotated - center_x_rotated) / rx_abs;
-    let end_vector_y = (-dy_rotated - center_y_rotated) / ry_abs;
-    let mut sweep_angle = angle_between(start_vector_x, start_vector_y, end_vector_x, end_vector_y);
-    if(!sweep && sweep_angle > 0.) {
-        sweep_angle -= 2. * PI;
-    } else if (sweep && sweep_angle < 0.) {
-        sweep_angle += 2. * PI;
-    }
-    sweep_angle = sweep_angle % (2. * PI);
-
-    let calc_formula = ellipse_curve(start_angle, sweep_angle, rx_abs, ry_abs, x_rad_rotation, center_x, center_y);
+    let calc_formula = ellipse_curve(
+        start_angle,
+        sweep_angle,
+        rx_abs,
+        ry_abs,
+        x_rad_rotation,
+        center_x,
+        center_y,
+    );
     Box::new(EllipsePointIterator {
         time,
         calc_formula,
-        end_x,
-        end_y,
+        end_x: end_point.x,
+        end_y: end_point.y,
     })
 }
 
