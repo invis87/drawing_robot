@@ -179,7 +179,8 @@ impl Iterator for dyn PointIterator {
     }
 }
 
-pub fn points_from_path_segments<'a>(path_segments: Box<dyn Iterator<Item=PathSegment>>) -> Box<dyn Iterator<Item = Box<dyn PointIterator + 'a>>> {
+//todo: try to change PointIterator to Iterator<Item=Point> in return type
+pub fn points_from_path_segments<'a>(path_segments: impl Iterator<Item=PathSegment> + 'static) -> Box<dyn Iterator<Item = Box<dyn PointIterator + 'a>>> {
     let mut current_point = Point {x: 0., y: 0.};
     let mut prev_support_point_opt: Option<SupportPoint> = None;
 

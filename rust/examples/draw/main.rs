@@ -22,7 +22,7 @@ fn points_to_draw() -> Box<dyn Iterator<Item = Box<dyn PointIterator>>> {
       "M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80 M10 280 Q 52.5 210, 95 280 T 180 280 T 250 280 M10 380 H 100 T 250 380 M10 480 Q 50 100, 95 480 S 150 550, 130 450 M10 680 A 30 50 0 0 1 62 627 L 80 630 A 3 5 -45 0 1 415 650";
     //        "M10 80 l 100 200 L 210 80";
     let path_parser = svgtypes::PathParser::from(svg_string);
-    let path_segments = Box::new(path_parser.filter_map(Result::ok).into_iter());
+    let path_segments = path_parser.filter_map(Result::ok).into_iter();
 
     points_from_path_segments(path_segments)
 }
