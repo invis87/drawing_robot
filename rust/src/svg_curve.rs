@@ -1,6 +1,4 @@
-use svgtypes::PathCommand::MoveTo;
 use svgtypes::{PathCommand, PathSegment};
-use winit::window::CursorIcon::Move;
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum MoveType {
@@ -13,12 +11,14 @@ struct TickTimer {
     pub time: f64,
 }
 
-impl TickTimer {
-    const TICK_PERIOD: f64 = 0.001; //todo: number of ticks should be calculated based on curve length
-
-    fn new() -> TickTimer {
+impl Default for TickTimer {
+    fn default() -> Self {
         TickTimer { time: 0.0 }
     }
+}
+
+impl TickTimer {
+    const TICK_PERIOD: f64 = 0.001; //todo: number of ticks should be calculated based on curve length
 }
 
 impl Iterator for TickTimer {
@@ -50,7 +50,7 @@ pub struct SupportPoint {
 pub trait PointIterator {
     fn get_support_point(&self) -> Option<SupportPoint>; //support point is always in absolute
     fn get_end_position(&self) -> Point;
-    fn move_type(&self) -> &MoveType;
+    fn move_type(&self) -> MoveType;
 
     fn next(&mut self) -> Option<Point>;
 }
@@ -72,8 +72,8 @@ impl PointIterator for EmptyPointIterator {
         }
     }
 
-    fn move_type(&self) -> &MoveType {
-        &MoveType::Fly
+    fn move_type(&self) -> MoveType {
+        MoveType::Fly
     }
 
     fn next(&mut self) -> Option<Point> {
@@ -111,8 +111,8 @@ impl PointIterator for LinePointIterator {
         }
     }
 
-    fn move_type(&self) -> &MoveType {
-        &self.move_type
+    fn move_type(&self) -> MoveType {
+        self.move_type
     }
 
     fn next(&mut self) -> Option<Point> {
@@ -153,8 +153,8 @@ impl PointIterator for CurvePointIterator {
         (self.calc_formula)(1.0)
     }
 
-    fn move_type(&self) -> &MoveType {
-        &self.move_type
+    fn move_type(&self) -> MoveType {
+        self.move_type
     }
 
     fn next(&mut self) -> Option<Point> {
@@ -184,8 +184,8 @@ impl PointIterator for EllipsePointIterator {
         }
     }
 
-    fn move_type(&self) -> &MoveType {
-        &MoveType::Draw
+    fn move_type(&self) -> MoveType {
+        MoveType::Draw
     }
 
     fn next(&mut self) -> Option<Point> {
@@ -354,7 +354,7 @@ pub fn calc_point_iterator(
             x,
             y,
         ),
-        PathSegment::ClosePath{abs} => {
+        PathSegment::ClosePath{abs: _} => {
             //todo: implement me
             return Box::new(EmptyPointIterator{end_x: 0., end_y: 0.})
         },
@@ -382,7 +382,7 @@ fn cubic_curve_to(
     y: f64,
     next_segment: PathSegment,
 ) -> CurvePointIterator {
-    let time = TickTimer::new();
+    let time: TickTimer = Default::default();
     let p1 = absolute_point_coord(&current, abs, x1, y1);
     let end_point = absolute_point_coord(&current, abs, x, y);
     let p2 = absolute_point_coord(&current, abs, x2, y2);
@@ -422,7 +422,7 @@ fn quadratic_curve_to(
     y: f64,
     next_segment: PathSegment,
 ) -> CurvePointIterator {
-    let time = TickTimer::new();
+    let time: TickTimer = Default::default();
     let p1 = absolute_point_coord(&current, abs, x1, y1);
     let end_point = absolute_point_coord(&current, abs, x, y);
     let support_point = Some(SupportPoint {
@@ -461,7 +461,7 @@ fn ellipse_curve_to(
     end_x: f64,
     end_y: f64,
 ) -> Box<dyn PointIterator> {
-    let time = TickTimer::new();
+    let time: TickTimer = Default::default();
 
     //calculations from: https://github.com/MadLittleMods/svg-curve-lib/
 

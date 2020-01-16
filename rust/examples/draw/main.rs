@@ -104,7 +104,7 @@ impl AppHandler for ExampleApp {
         let mut prev_init = false;
         let mut prev_point: Point = Point { x: 0.0, y: 0.0 };
         for points in points_iterator {
-            let current_move_type = *points.move_type();
+            let current_move_type = points.move_type();
             for point in points {
                 if !prev_init {
                     prev_init = true;
