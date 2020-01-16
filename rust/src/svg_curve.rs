@@ -7,7 +7,6 @@ pub enum MoveType {
     Fly,
     Draw,
     Erase,
-    Ellipse,
 }
 
 struct TickTimer {
@@ -186,11 +185,10 @@ impl PointIterator for EllipsePointIterator {
     }
 
     fn move_type(&self) -> &MoveType {
-        &MoveType::Ellipse
+        &MoveType::Draw
     }
 
     fn next(&mut self) -> Option<Point> {
-        //todo: change it to be based on end position, not on time
         match self.time.next() {
             Some(time) => Some((self.calc_formula)(time)),
             None => None,
@@ -356,17 +354,10 @@ pub fn calc_point_iterator(
             x,
             y,
         ),
-        //        PathSegment::ClosePath{abs} => ()
-        _ => {
-            //todo: remove me
-            let time = TickTimer::new();
-            let end_point = absolute_point_coord(&current, true, 20., 33.);
-            Box::new(LinePointIterator::new(
-                end_point.x,
-                end_point.y,
-                MoveType::Fly,
-            ))
-        }
+        PathSegment::ClosePath{abs} => {
+            //todo: implement me
+            return Box::new(EmptyPointIterator{end_x: 0., end_y: 0.})
+        },
     }
 }
 
