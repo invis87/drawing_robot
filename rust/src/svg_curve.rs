@@ -128,14 +128,14 @@ impl PointIterator for LinePointIterator {
     }
 }
 
-pub struct CurvePointIterator {
+pub struct CurvePointIterator<F: Fn(f64) -> Point> {
     time: TickTimer,
-    calc_formula: Box<dyn Fn(f64) -> Point>,
+    calc_formula: F,
     move_type: MoveType,
     support_point: Option<SupportPoint>,
 }
 
-impl PointIterator for CurvePointIterator {
+impl<F: Fn(f64) -> Point> PointIterator for CurvePointIterator<F> {
     fn get_support_point(&self) -> Option<SupportPoint> {
         match &self.support_point {
             Some(supp_p) => Some(SupportPoint {
@@ -165,14 +165,14 @@ impl PointIterator for CurvePointIterator {
     }
 }
 
-pub struct EllipsePointIterator {
+pub struct EllipsePointIterator<F: Fn(f64) -> Point> {
     time: TickTimer,
-    calc_formula: Box<dyn Fn(f64) -> Point>,
+    calc_formula: F,
     end_x: f64,
     end_y: f64,
 }
 
-impl PointIterator for EllipsePointIterator {
+impl<F: Fn(f64) -> Point> PointIterator for EllipsePointIterator<F> {
     fn get_support_point(&self) -> Option<SupportPoint> {
         None
     }
@@ -296,7 +296,7 @@ pub fn calc_point_iterator(
             y2,
             x,
             y,
-        } => Box::new(cubic_curve_to(
+        } => cubic_curve_to(
             &current,
             abs,
             x1,
@@ -306,8 +306,8 @@ pub fn calc_point_iterator(
             x,
             y,
             next_segment,
-        )),
-        PathSegment::SmoothCurveTo { abs, x2, y2, x, y } => Box::new(smooth_cubic_curve_to(
+        ),
+        PathSegment::SmoothCurveTo { abs, x2, y2, x, y } => smooth_cubic_curve_to(
             &current,
             abs,
             x2,
@@ -316,8 +316,8 @@ pub fn calc_point_iterator(
             y,
             prev_support_point_opt,
             next_segment,
-        )),
-        PathSegment::Quadratic { abs, x1, y1, x, y } => Box::new(quadratic_curve_to(
+        ),
+        PathSegment::Quadratic { abs, x1, y1, x, y } => quadratic_curve_to(
             &current,
             abs,
             x1,
@@ -325,15 +325,15 @@ pub fn calc_point_iterator(
             x,
             y,
             next_segment,
-        )),
-        PathSegment::SmoothQuadratic { abs, x, y } => Box::new(smooth_quadratic_curve_to(
+        ),
+        PathSegment::SmoothQuadratic { abs, x, y } => smooth_quadratic_curve_to(
             &current,
             abs,
             x,
             y,
             prev_support_point_opt,
             next_segment,
-        )),
+        ),
         PathSegment::EllipticalArc {
             abs,
             rx,
@@ -381,7 +381,7 @@ fn cubic_curve_to(
     x: f64,
     y: f64,
     next_segment: PathSegment,
-) -> CurvePointIterator {
+) -> Box<dyn PointIterator> {
     let time: TickTimer = Default::default();
     let p1 = absolute_point_coord(&current, abs, x1, y1);
     let end_point = absolute_point_coord(&current, abs, x, y);
@@ -391,12 +391,12 @@ fn cubic_curve_to(
         point: Point { x: p2.x, y: p2.y },
     });
     let calc_formula = cubic_curve(current.x, current.y, p1, p2, end_point);
-    CurvePointIterator {
+    Box::new(CurvePointIterator {
         time,
         calc_formula,
         move_type: MoveType::Draw,
         support_point,
-    }
+    })
 }
 
 fn smooth_cubic_curve_to(
@@ -408,7 +408,7 @@ fn smooth_cubic_curve_to(
     y: f64,
     prev_support_point_opt: Option<SupportPoint>,
     next_segment: PathSegment,
-) -> CurvePointIterator {
+) -> Box<dyn PointIterator> {
     let p1 = mirrored_point(current, abs, prev_support_point_opt, CurveType::Cubic);
     cubic_curve_to(current, abs, p1.x, p1.y, x2, y2, x, y, next_segment)
 }
@@ -421,7 +421,7 @@ fn quadratic_curve_to(
     x: f64,
     y: f64,
     next_segment: PathSegment,
-) -> CurvePointIterator {
+) -> Box<dyn PointIterator> {
     let time: TickTimer = Default::default();
     let p1 = absolute_point_coord(&current, abs, x1, y1);
     let end_point = absolute_point_coord(&current, abs, x, y);
@@ -430,12 +430,12 @@ fn quadratic_curve_to(
         point: Point { x: p1.x, y: p1.y },
     });
     let calc_formula = square_curve(current.x, current.y, p1, end_point);
-    CurvePointIterator {
+    Box::new(CurvePointIterator {
         time,
         calc_formula,
         move_type: MoveType::Draw,
         support_point,
-    }
+    })
 }
 
 fn smooth_quadratic_curve_to(
@@ -445,7 +445,7 @@ fn smooth_quadratic_curve_to(
     y: f64,
     prev_support_point_opt: Option<SupportPoint>,
     next_segment: PathSegment,
-) -> CurvePointIterator {
+) -> Box<dyn PointIterator> {
     let p1 = mirrored_point(current, abs, prev_support_point_opt, CurveType::Quadratic);
     quadratic_curve_to(current, abs, p1.x, p1.y, x, y, next_segment)
 }
