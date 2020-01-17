@@ -1,14 +1,7 @@
-use svgtypes::{PathCommand, PathSegment};
+use svgtypes::{PathCommand, PathSegment, Stream};
 
 use super::math::*;
 use super::tick_timer::TickTimer;
-
-#[derive(PartialEq, Copy, Clone)]
-pub enum MoveType {
-    Fly,
-    Draw,
-    Erase,
-}
 
 #[derive(Debug)]
 pub struct Point {
@@ -16,13 +9,55 @@ pub struct Point {
     pub y: f64,
 }
 
+pub enum LineTo {
+    Fly(Point),
+    Draw(Point),
+    Erase(Point),
+}
+
+impl LineTo {
+
+    fn new(point: Point, move_type: MoveType) -> Self {
+        match move_type {
+            MoveType::Fly => LineTo::Fly(point),
+            MoveType::Draw => LineTo::Draw(point),
+            MoveType::Erase => LineTo::Erase(point),
+        }
+    }
+}
+
+pub fn points_from_path_segments(path_segments: impl Iterator<Item=PathSegment> + 'static) -> Box<dyn Iterator<Item = LineTo>> {
+    let mut current_point = Point {x: 0., y: 0.};
+    let mut prev_support_point_opt: Option<SupportPoint> = None;
+
+    Box::new(path_segments.flat_map(move |path_segment| {
+        let point_iterator =
+            calc_point_iterator(&current_point, path_segment, &prev_support_point_opt);
+        prev_support_point_opt = point_iterator.get_support_point();
+        current_point = point_iterator.get_end_position();
+
+        let move_type = point_iterator.move_type();
+        point_iterator.map(move |point| LineTo::new(point, move_type)).into_iter()
+
+    }).into_iter())
+}
+
+// === private members ===
+
+#[derive(PartialEq, Copy, Clone)]
+enum MoveType {
+    Fly,
+    Draw,
+    Erase,
+}
+
 #[derive(Debug)]
-pub struct SupportPoint {
+struct SupportPoint {
     path_command: PathCommand,
     point: Point,
 }
 
-pub trait PointIterator {
+trait PointIterator {
     fn get_support_point(&self) -> Option<SupportPoint>; //support point is always in absolute
     fn get_end_position(&self) -> Point;
     fn move_type(&self) -> MoveType;
@@ -179,21 +214,7 @@ impl Iterator for dyn PointIterator {
     }
 }
 
-//todo: try to change PointIterator to Iterator<Item=Point> in return type
-pub fn points_from_path_segments<'a>(path_segments: impl Iterator<Item=PathSegment> + 'static) -> Box<dyn Iterator<Item = Box<dyn PointIterator + 'a>>> {
-    let mut current_point = Point {x: 0., y: 0.};
-    let mut prev_support_point_opt: Option<SupportPoint> = None;
-
-    Box::new(path_segments.map(move |path_segment| {
-        let point_iterator =
-            calc_point_iterator(&current_point, path_segment, &prev_support_point_opt);
-        prev_support_point_opt = point_iterator.get_support_point();
-        current_point = point_iterator.get_end_position();
-        point_iterator
-    }).into_iter())
-}
-
-pub fn calc_point_iterator(
+fn calc_point_iterator(
     current: &Point,
     next_segment: PathSegment,
     prev_support_point_opt: &Option<SupportPoint>,

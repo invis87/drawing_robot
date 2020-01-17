@@ -9,11 +9,9 @@ use skulpin::VirtualKeyCode;
 use skulpin::{AppHandler, CoordinateSystem};
 use std::ffi::CString;
 
-use drawing_robot::svg::svg_curve::{calc_point_iterator, MoveType, Point, PointIterator, SupportPoint, points_from_path_segments};
-use std::collections::LinkedList;
-use svgtypes::PathSegment;
+use drawing_robot::svg::svg_curve::{Point, points_from_path_segments, LineTo};
 
-fn points_to_draw() -> Box<dyn Iterator<Item = Box<dyn PointIterator>>> {
+fn points_to_draw() -> Box<dyn Iterator<Item =LineTo>> {
     let svg_string =
 //    "M 10,30 A 20,20 0,0,1 50,30 A 20,20 0,0,1 90,30 Q 90,60 50,90 Q 10,60 10,30"; // heart
 //    "M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80 M10 280 Q 52.5 210, 95 280 T 180 280 T 250 280 M10 380 H 100 T 250 380 M10 480 Q 50 100, 95 480 S 150 550, 130 450";
@@ -89,26 +87,23 @@ impl AppHandler for ExampleApp {
 
         // Draw SVG
         let points_iterator = points_to_draw();
-        let mut prev_init = false;
         let mut prev_point: Point = Point { x: 0.0, y: 0.0 };
         for points in points_iterator {
-            let current_move_type = points.move_type();
-            for point in points {
-                if !prev_init {
-                    prev_init = true;
+            match points {
+                LineTo::Fly(point) => {
+                    prev_point = point
+                },
+
+                LineTo::Draw(point) => {
+                    canvas.draw_line(
+                        skia_safe::Point::new(prev_point.x as f32, prev_point.y as f32),
+                        skia_safe::Point::new(point.x as f32, point.y as f32),
+                        &paint,
+                    );
                     prev_point = point;
-                } else {
-                    if current_move_type != MoveType::Fly {
-                        canvas.draw_line(
-                            skia_safe::Point::new(prev_point.x as f32, prev_point.y as f32),
-                            skia_safe::Point::new(point.x as f32, point.y as f32),
-                            &paint,
-                        );
-                        prev_point = point;
-                    } else {
-                        prev_init = false;
-                    }
-                }
+                },
+
+                LineTo::Erase(_) => {},
             }
         }
     }
