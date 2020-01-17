@@ -29,12 +29,21 @@ impl LineTo {
 pub fn points_from_path_segments<'a>(path_segments: impl Iterator<Item=PathSegment> + 'a) -> Box<dyn Iterator<Item = LineTo> + 'a> {
     let mut current_point = Point {x: 0., y: 0.};
     let mut prev_support_point_opt: Option<SupportPoint> = None;
+    let mut path_start_point = Point {x: 0., y: 0.};
+    let mut path_start_point_initialized = false;
 
     Box::new(path_segments.flat_map(move |path_segment| {
         let point_iterator =
-            calc_point_iterator(&current_point, path_segment, &prev_support_point_opt);
+            calc_point_iterator(&current_point, path_segment, &prev_support_point_opt, &path_start_point);
         prev_support_point_opt = point_iterator.get_support_point();
         current_point = point_iterator.get_end_position();
+
+        if !path_start_point_initialized && path_segment.cmd() != PathCommand::ClosePath {
+            path_start_point_initialized = true;
+            path_start_point = current_point;
+        } else if path_segment.cmd() == PathCommand::ClosePath {
+            path_start_point_initialized = false;
+        }
 
         let move_type = point_iterator.move_type();
         point_iterator.map(move |point| LineTo::new(point, move_type))
@@ -224,12 +233,19 @@ fn calc_point_iterator(
     current: &Point,
     next_segment: PathSegment,
     prev_support_point_opt: &Option<SupportPoint>,
+    path_start_point: &Point //want that to implement ClosePath
 ) -> Box<dyn PointIterator> {
     match next_segment {
         PathSegment::MoveTo { abs, x, y } => Box::new(move_to(current, abs, x, y)),
         PathSegment::LineTo { abs, x, y } => Box::new(line_to(current, abs, x, y)),
-        PathSegment::HorizontalLineTo { abs, x } => Box::new(line_to(current, abs, x, current.y)),
-        PathSegment::VerticalLineTo { abs, y } => Box::new(line_to(current, abs, current.x, y)),
+        PathSegment::HorizontalLineTo { abs, x } => {
+            let miss_coord = if abs { current.y } else { 0. };
+            Box::new(line_to(current, abs, x, miss_coord))
+        },
+        PathSegment::VerticalLineTo { abs, y } => {
+            let miss_coord = if abs { current.x } else { 0. };
+            Box::new(line_to(current, abs, miss_coord, y))
+        },
         PathSegment::CurveTo {
             abs,
             x1,
@@ -276,11 +292,7 @@ fn calc_point_iterator(
             y,
         ),
         PathSegment::ClosePath { abs: _ } => {
-            //todo: implement me
-            return Box::new(EmptyPointIterator {
-                end_x: 0.,
-                end_y: 0.,
-            });
+            Box::new(line_to(current, true, path_start_point.x, path_start_point.y))
         }
     }
 }
