@@ -10,6 +10,7 @@ use skulpin::{AppHandler, CoordinateSystem};
 use std::ffi::CString;
 
 use drawing_robot::svg::svg_curve::{Point, points_from_path_segments, LineTo};
+use std::collections::LinkedList;
 
 fn points_to_draw() -> Box<dyn Iterator<Item =LineTo>> {
     let svg_string =
@@ -17,7 +18,7 @@ fn points_to_draw() -> Box<dyn Iterator<Item =LineTo>> {
 //    "M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80 M10 280 Q 52.5 210, 95 280 T 180 280 T 250 280 M10 380 H 100 T 250 380 M10 480 Q 50 100, 95 480 S 150 550, 130 450";
 //    "M 110 215 A 36 60 0 0 0 150.71 170.29 M 110 215 A 36 60 0 0 1 150.71 170.29 M 110 215 A 36 60 0 1 0 150.71 170.29 M 110 215 A 36 60 0 1 1 150.71 170.29"; // 4 curves that creates 2 ellipses
 
-      "M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80 M10 280 Q 52.5 210, 95 280 T 180 280 T 250 280 M10 380 H 100 T 250 380 M10 480 Q 50 100, 95 480 S 150 550, 130 450 M10 680 A 30 50 0 0 1 62 627 L 80 630 A 3 5 -45 0 1 415 650";
+      "M10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80 M10 280 Q 52.5 210, 95 280 T 180 280 T 250 280 M10 380 H 100 T 250 380 M10 480 Q 50 100, 95 480 S 150 550, 130 450 M10 680 A 30 50 0 0 1 62 627 L 80 630 A 3 5 -45 0 1 140 570";
     //        "M10 80 l 100 200 L 210 80";
     let path_parser = svgtypes::PathParser::from(svg_string);
     let path_segments = path_parser.filter_map(Result::ok).into_iter();
@@ -48,11 +49,19 @@ fn main() {
         .run(example_app);
 }
 
-struct ExampleApp {}
+struct ExampleApp {
+    points_to_draw: LinkedList<LineTo>
+}
 
 impl ExampleApp {
     pub fn new() -> Self {
-        ExampleApp {}
+        let mut linked_list = LinkedList::new();
+        for point in points_to_draw() {
+            linked_list.push_back(point)
+        }
+        ExampleApp {
+            points_to_draw: linked_list
+        }
     }
 }
 
@@ -86,12 +95,11 @@ impl AppHandler for ExampleApp {
         paint.set_stroke_width(2.0);
 
         // Draw SVG
-        let points_iterator = points_to_draw();
         let mut prev_point: Point = Point { x: 0.0, y: 0.0 };
-        for points in points_iterator {
+        for points in self.points_to_draw.iter() {
             match points {
                 LineTo::Fly(point) => {
-                    prev_point = point
+                    prev_point = point.clone()
                 },
 
                 LineTo::Draw(point) => {
@@ -100,7 +108,7 @@ impl AppHandler for ExampleApp {
                         skia_safe::Point::new(point.x as f32, point.y as f32),
                         &paint,
                     );
-                    prev_point = point;
+                    prev_point = point.clone();
                 },
 
                 LineTo::Erase(_) => {},

@@ -1,9 +1,9 @@
-use svgtypes::{PathCommand, PathSegment, Stream};
+use svgtypes::{PathCommand, PathSegment};
 
 use super::math::*;
 use super::tick_timer::TickTimer;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Point {
     pub x: f64,
     pub y: f64,
@@ -365,7 +365,11 @@ fn smooth_quadratic_curve_to(
     next_segment: PathSegment,
 ) -> Box<dyn PointIterator> {
     let p1 = mirrored_point(current, abs, prev_support_point_opt, CurveType::Quadratic);
-    quadratic_curve_to(current, abs, p1.x, p1.y, x, y, next_segment)
+    if p1.x == current.x && p1.y == current.y {
+        Box::new(line_to(current, abs, x, y))
+    } else {
+        quadratic_curve_to(current, abs, p1.x, p1.y, x, y, next_segment)
+    }
 }
 
 fn ellipse_curve_to(
