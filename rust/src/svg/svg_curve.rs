@@ -22,17 +22,23 @@ pub struct SupportPoint {
     point: Point,
 }
 
-pub trait PointIterator {
+pub trait PointIterator: Iterator<Item=Point> {
     fn get_support_point(&self) -> Option<SupportPoint>; //support point is always in absolute
     fn get_end_position(&self) -> Point;
     fn move_type(&self) -> MoveType;
-
-    fn next(&mut self) -> Option<Point>;
 }
 
 struct EmptyPointIterator {
     end_x: f64,
     end_y: f64,
+}
+
+impl Iterator for EmptyPointIterator {
+    type Item = Point;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        None
+    }
 }
 
 impl PointIterator for EmptyPointIterator {
@@ -49,10 +55,6 @@ impl PointIterator for EmptyPointIterator {
 
     fn move_type(&self) -> MoveType {
         MoveType::Fly
-    }
-
-    fn next(&mut self) -> Option<Point> {
-        None
     }
 }
 
@@ -74,6 +76,22 @@ impl LinePointIterator {
     }
 }
 
+impl Iterator for LinePointIterator {
+    type Item = Point;
+
+    fn next(&mut self) -> Option<Self::Item> {
+            if self.done {
+                None
+            } else {
+                self.done = true;
+                Some(Point {
+                    x: self.end_x,
+                    y: self.end_y,
+                })
+            }
+    }
+}
+
 impl PointIterator for LinePointIterator {
     fn get_support_point(&self) -> Option<SupportPoint> {
         None
@@ -89,18 +107,6 @@ impl PointIterator for LinePointIterator {
     fn move_type(&self) -> MoveType {
         self.move_type
     }
-
-    fn next(&mut self) -> Option<Point> {
-        if self.done {
-            None
-        } else {
-            self.done = true;
-            Some(Point {
-                x: self.end_x,
-                y: self.end_y,
-            })
-        }
-    }
 }
 
 struct CurvePointIterator<F: Fn(f64) -> Point> {
@@ -108,6 +114,17 @@ struct CurvePointIterator<F: Fn(f64) -> Point> {
     calc_formula: F,
     move_type: MoveType,
     support_point: Option<SupportPoint>,
+}
+
+impl<F: Fn(f64) -> Point> Iterator for CurvePointIterator<F> {
+    type Item = Point;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.time.next() {
+            Some(time) => Some((self.calc_formula)(time)),
+            None => None,
+        }
+    }
 }
 
 impl<F: Fn(f64) -> Point> PointIterator for CurvePointIterator<F> {
@@ -131,13 +148,6 @@ impl<F: Fn(f64) -> Point> PointIterator for CurvePointIterator<F> {
     fn move_type(&self) -> MoveType {
         self.move_type
     }
-
-    fn next(&mut self) -> Option<Point> {
-        match self.time.next() {
-            Some(time) => Some((self.calc_formula)(time)),
-            None => None,
-        }
-    }
 }
 
 struct EllipsePointIterator<F: Fn(f64) -> Point> {
@@ -145,6 +155,17 @@ struct EllipsePointIterator<F: Fn(f64) -> Point> {
     calc_formula: F,
     end_x: f64,
     end_y: f64,
+}
+
+impl<F: Fn(f64) -> Point> Iterator for EllipsePointIterator<F> {
+    type Item = Point;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.time.next() {
+            Some(time) => Some((self.calc_formula)(time)),
+            None => None,
+        }
+    }
 }
 
 impl<F: Fn(f64) -> Point> PointIterator for EllipsePointIterator<F> {
@@ -161,21 +182,6 @@ impl<F: Fn(f64) -> Point> PointIterator for EllipsePointIterator<F> {
 
     fn move_type(&self) -> MoveType {
         MoveType::Draw
-    }
-
-    fn next(&mut self) -> Option<Point> {
-        match self.time.next() {
-            Some(time) => Some((self.calc_formula)(time)),
-            None => None,
-        }
-    }
-}
-
-impl Iterator for dyn PointIterator {
-    type Item = Point;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.next()
     }
 }
 
