@@ -16,7 +16,6 @@ pub enum LineTo {
 }
 
 impl LineTo {
-
     fn new(point: Point, move_type: MoveType) -> Self {
         match move_type {
             MoveType::Fly => LineTo::Fly(point),
@@ -26,15 +25,21 @@ impl LineTo {
     }
 }
 
-pub fn points_from_path_segments<'a>(path_segments: impl Iterator<Item=PathSegment> + 'a) -> Box<dyn Iterator<Item = LineTo> + 'a> {
-    let mut current_point = Point {x: 0., y: 0.};
+pub fn points_from_path_segments<'a>(
+    path_segments: impl Iterator<Item = PathSegment> + 'a,
+) -> Box<dyn Iterator<Item = LineTo> + 'a> {
+    let mut current_point = Point { x: 0., y: 0. };
     let mut prev_support_point_opt: Option<SupportPoint> = None;
-    let mut path_start_point = Point {x: 0., y: 0.};
+    let mut path_start_point = Point { x: 0., y: 0. };
     let mut path_start_point_initialized = false;
 
     Box::new(path_segments.flat_map(move |path_segment| {
-        let point_iterator =
-            calc_point_iterator(&current_point, path_segment, &prev_support_point_opt, &path_start_point);
+        let point_iterator = calc_point_iterator(
+            &current_point,
+            path_segment,
+            &prev_support_point_opt,
+            &path_start_point,
+        );
         prev_support_point_opt = point_iterator.get_support_point();
         current_point = point_iterator.get_end_position();
 
@@ -47,7 +52,6 @@ pub fn points_from_path_segments<'a>(path_segments: impl Iterator<Item=PathSegme
 
         let move_type = point_iterator.move_type();
         point_iterator.map(move |point| LineTo::new(point, move_type))
-
     }))
 }
 
@@ -66,7 +70,7 @@ struct SupportPoint {
     point: Point,
 }
 
-trait PointIterator: Iterator<Item=Point> {
+trait PointIterator: Iterator<Item = Point> {
     fn get_support_point(&self) -> Option<SupportPoint>; //support point is always in absolute
     fn get_end_position(&self) -> Point;
     fn move_type(&self) -> MoveType;
@@ -107,6 +111,7 @@ struct LinePointIterator {
     end_y: f64,
     move_type: MoveType,
     done: bool,
+    support_point: Option<SupportPoint>,
 }
 
 impl LinePointIterator {
@@ -116,6 +121,22 @@ impl LinePointIterator {
             end_y,
             move_type,
             done: false,
+            support_point: None,
+        }
+    }
+
+    fn as_fake_curve(
+        end_x: f64,
+        end_y: f64,
+        move_type: MoveType,
+        support_point: Option<SupportPoint>,
+    ) -> Self {
+        LinePointIterator {
+            end_x,
+            end_y,
+            move_type,
+            done: false,
+            support_point,
         }
     }
 }
@@ -124,21 +145,30 @@ impl Iterator for LinePointIterator {
     type Item = Point;
 
     fn next(&mut self) -> Option<Self::Item> {
-            if self.done {
-                None
-            } else {
-                self.done = true;
-                Some(Point {
-                    x: self.end_x,
-                    y: self.end_y,
-                })
-            }
+        if self.done {
+            None
+        } else {
+            self.done = true;
+            Some(Point {
+                x: self.end_x,
+                y: self.end_y,
+            })
+        }
     }
 }
 
 impl PointIterator for LinePointIterator {
     fn get_support_point(&self) -> Option<SupportPoint> {
-        None
+        match &self.support_point {
+            Some(supp_p) => Some(SupportPoint {
+                path_command: supp_p.path_command,
+                point: Point {
+                    x: supp_p.point.x,
+                    y: supp_p.point.y,
+                },
+            }),
+            None => None,
+        }
     }
 
     fn get_end_position(&self) -> Point {
@@ -233,7 +263,7 @@ fn calc_point_iterator(
     current: &Point,
     next_segment: PathSegment,
     prev_support_point_opt: &Option<SupportPoint>,
-    path_start_point: &Point //want that to implement ClosePath
+    path_start_point: &Point, //want that to implement ClosePath
 ) -> Box<dyn PointIterator> {
     match next_segment {
         PathSegment::MoveTo { abs, x, y } => Box::new(move_to(current, abs, x, y)),
@@ -241,11 +271,11 @@ fn calc_point_iterator(
         PathSegment::HorizontalLineTo { abs, x } => {
             let miss_coord = if abs { current.y } else { 0. };
             Box::new(line_to(current, abs, x, miss_coord))
-        },
+        }
         PathSegment::VerticalLineTo { abs, y } => {
             let miss_coord = if abs { current.x } else { 0. };
             Box::new(line_to(current, abs, miss_coord, y))
-        },
+        }
         PathSegment::CurveTo {
             abs,
             x1,
@@ -291,9 +321,12 @@ fn calc_point_iterator(
             x,
             y,
         ),
-        PathSegment::ClosePath { abs: _ } => {
-            Box::new(line_to(current, true, path_start_point.x, path_start_point.y))
-        }
+        PathSegment::ClosePath { abs: _ } => Box::new(line_to(
+            current,
+            true,
+            path_start_point.x,
+            path_start_point.y,
+        )),
     }
 }
 
@@ -326,13 +359,26 @@ fn cubic_curve_to(
         path_command: next_segment.cmd(),
         point: Point { x: p2.x, y: p2.y },
     });
-    let calc_formula = cubic_curve(current.x, current.y, p1, p2, end_point);
-    Box::new(CurvePointIterator {
-        time,
-        calc_formula,
-        move_type: MoveType::Draw,
-        support_point,
-    })
+
+    let p1_on_lane = is_point_on_lane(current, &end_point, &p1);
+    let p2_on_lane = is_point_on_lane(current, &end_point, &p2);
+
+    if p1_on_lane && p2_on_lane {
+        Box::new(LinePointIterator::as_fake_curve(
+            end_point.x,
+            end_point.y,
+            MoveType::Draw,
+            support_point,
+        ))
+    } else {
+        let calc_formula = cubic_curve(current.x, current.y, p1, p2, end_point);
+        Box::new(CurvePointIterator {
+            time,
+            calc_formula,
+            move_type: MoveType::Draw,
+            support_point,
+        })
+    }
 }
 
 fn smooth_cubic_curve_to(
@@ -365,13 +411,24 @@ fn quadratic_curve_to(
         path_command: next_segment.cmd(),
         point: Point { x: p1.x, y: p1.y },
     });
-    let calc_formula = square_curve(current.x, current.y, p1, end_point);
-    Box::new(CurvePointIterator {
-        time,
-        calc_formula,
-        move_type: MoveType::Draw,
-        support_point,
-    })
+
+    let p1_on_lane = is_point_on_lane(current, &end_point, &p1);
+    if p1_on_lane {
+        Box::new(LinePointIterator::as_fake_curve(
+            end_point.x,
+            end_point.y,
+            MoveType::Draw,
+            support_point,
+        ))
+    } else {
+        let calc_formula = square_curve(current.x, current.y, p1, end_point);
+        Box::new(CurvePointIterator {
+            time,
+            calc_formula,
+            move_type: MoveType::Draw,
+            support_point,
+        })
+    }
 }
 
 fn smooth_quadratic_curve_to(
@@ -383,11 +440,7 @@ fn smooth_quadratic_curve_to(
     next_segment: PathSegment,
 ) -> Box<dyn PointIterator> {
     let p1 = mirrored_point(current, abs, prev_support_point_opt, CurveType::Quadratic);
-    if p1.x == current.x && p1.y == current.y {
-        Box::new(line_to(current, abs, x, y))
-    } else {
-        quadratic_curve_to(current, abs, p1.x, p1.y, x, y, next_segment)
-    }
+    quadratic_curve_to(current, abs, p1.x, p1.y, x, y, next_segment)
 }
 
 fn ellipse_curve_to(

@@ -9,10 +9,10 @@ use skulpin::VirtualKeyCode;
 use skulpin::{AppHandler, CoordinateSystem};
 use std::ffi::CString;
 
-use drawing_robot::svg::svg_curve::{Point, points_from_path_segments, LineTo};
+use drawing_robot::svg::svg_curve::{points_from_path_segments, LineTo, Point};
 use std::collections::LinkedList;
 
-fn points_to_draw() -> Box<dyn Iterator<Item =LineTo>> {
+fn points_to_draw() -> Box<dyn Iterator<Item = LineTo>> {
     let svg_string = "M212.182,587.076h6.219c17.621,0,30.682,10.885,39.186,32.653c10.156,0,17.104,8.504,20.836,25.501
 					c-2.074,10.161-4.252,15.238-6.531,15.238H156.826c-4.771-5.18-7.152-10.263-7.152-15.238v-6.53
 					c0-13.684,8.188-23.014,24.566-27.989c3.111,0,6.113-3.003,9.02-9.019C192.59,591.95,202.23,587.076,212.182,587.076z
@@ -101,7 +101,7 @@ fn main() {
 }
 
 struct ExampleApp {
-    points_to_draw: LinkedList<LineTo>
+    points_to_draw: LinkedList<LineTo>,
 }
 
 impl ExampleApp {
@@ -111,7 +111,7 @@ impl ExampleApp {
             linked_list.push_back(point)
         }
         ExampleApp {
-            points_to_draw: linked_list
+            points_to_draw: linked_list,
         }
     }
 }
@@ -149,9 +149,7 @@ impl AppHandler for ExampleApp {
         let mut prev_point: Point = Point { x: 0.0, y: 0.0 };
         for points in self.points_to_draw.iter() {
             match points {
-                LineTo::Fly(point) => {
-                    prev_point = point.clone()
-                },
+                LineTo::Fly(point) => prev_point = point.clone(),
 
                 LineTo::Draw(point) => {
                     canvas.draw_line(
@@ -160,9 +158,9 @@ impl AppHandler for ExampleApp {
                         &paint,
                     );
                     prev_point = point.clone();
-                },
+                }
 
-                LineTo::Erase(_) => {},
+                LineTo::Erase(_) => {}
             }
         }
     }

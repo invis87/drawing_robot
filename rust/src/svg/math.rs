@@ -170,3 +170,23 @@ pub fn angle_between(start_x: f64, start_y: f64, end_x: f64, end_y: f64) -> f64 
     let angle = sign * (p / n).acos();
     return angle;
 }
+
+const EPSILON: f64 = 0.05;
+pub fn is_point_on_lane(lane_start: &Point, lane_end: &Point, p: &Point) -> bool {
+    let vector_x = lane_end.x - lane_start.x;
+    let vector_y = lane_end.y - lane_start.y;
+
+    let left_part = if vector_x == 0. {
+        0.
+    } else {
+        (p.x - lane_start.x) / vector_x
+    };
+    let right_part = if vector_y == 0. {
+        0.
+    } else {
+        (p.y - lane_start.y) / vector_y
+    };
+
+    let is_on_lane = left_part - right_part;
+    is_on_lane.abs() < EPSILON
+}
