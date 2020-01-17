@@ -26,7 +26,7 @@ impl LineTo {
     }
 }
 
-pub fn points_from_path_segments(path_segments: impl Iterator<Item=PathSegment> + 'static) -> Box<dyn Iterator<Item = LineTo>> {
+pub fn points_from_path_segments<'a>(path_segments: impl Iterator<Item=PathSegment> + 'a) -> Box<dyn Iterator<Item = LineTo> + 'a> {
     let mut current_point = Point {x: 0., y: 0.};
     let mut prev_support_point_opt: Option<SupportPoint> = None;
 
@@ -37,9 +37,9 @@ pub fn points_from_path_segments(path_segments: impl Iterator<Item=PathSegment> 
         current_point = point_iterator.get_end_position();
 
         let move_type = point_iterator.move_type();
-        point_iterator.map(move |point| LineTo::new(point, move_type)).into_iter()
+        point_iterator.map(move |point| LineTo::new(point, move_type))
 
-    }).into_iter())
+    }))
 }
 
 // === private members ===
