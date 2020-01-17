@@ -57,7 +57,7 @@ struct SupportPoint {
     point: Point,
 }
 
-pub trait PointIterator: Iterator<Item=Point> {
+trait PointIterator: Iterator<Item=Point> {
     fn get_support_point(&self) -> Option<SupportPoint>; //support point is always in absolute
     fn get_end_position(&self) -> Point;
     fn move_type(&self) -> MoveType;
