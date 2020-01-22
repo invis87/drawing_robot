@@ -63,7 +63,7 @@ pub fn ellipse_curve(
 }
 
 pub fn ellipse_support_calc(
-    current: &Point,
+    current: Point,
     rx: f64,
     ry: f64,
     x_axis_rotation: f64,
@@ -123,11 +123,13 @@ pub fn ellipse_support_calc(
     // Step #4: Compute start/sweep angles
     let start_vector_x = (dx_rotated - center_x_rotated) / rx_abs;
     let start_vector_y = (dy_rotated - center_y_rotated) / ry_abs;
-    let start_angle = angle_between(1., 0., start_vector_x, start_vector_y);
+    let start_vector = Point::new(start_vector_x, start_vector_y);
+    let start_angle = angle_between(Point::new(1., 0.), start_vector);
 
     let end_vector_x = (-dx_rotated - center_x_rotated) / rx_abs;
     let end_vector_y = (-dy_rotated - center_y_rotated) / ry_abs;
-    let mut sweep_angle = angle_between(start_vector_x, start_vector_y, end_vector_x, end_vector_y);
+    let end_vector = Point::new(end_vector_x, end_vector_y);
+    let mut sweep_angle = angle_between(start_vector, end_vector);
     if !sweep && sweep_angle > 0. {
         sweep_angle -= 2. * PI;
     } else if sweep && sweep_angle < 0. {
@@ -151,9 +153,9 @@ pub fn sqr(x: f64) -> f64 {
 }
 
 pub fn angle_between(start: Point, end: Point) -> f64 {
-    let p = start_x * end_x + start_y * end_y;
-    let n = ((sqr(start_x) + sqr(start_y)) * (sqr(end_x) + sqr(end_y))).sqrt();
-    let sign = if start_x * end_y - start_y * end_x < 0. {
+    let p = start.x * end.x + start.y * end.y;
+    let n = ((sqr(start.x) + sqr(start.y)) * (sqr(end.x) + sqr(end.y))).sqrt();
+    let sign = if start.x * end.y - start.y * end.x < 0. {
         -1.
     } else {
         1.
@@ -163,19 +165,18 @@ pub fn angle_between(start: Point, end: Point) -> f64 {
 }
 
 const EPSILON: f64 = 0.05;
-pub fn is_point_on_lane(lane_start: &Point, lane_end: &Point, p: &Point) -> bool {
-    let vector_x = lane_end.x - lane_start.x;
-    let vector_y = lane_end.y - lane_start.y;
+pub fn is_point_on_lane(lane_start: Point, lane_end: Point, p: &Point) -> bool {
+    let vector = lane_end - lane_start;
 
-    let left_part = if vector_x == 0. {
+    let left_part = if vector.x == 0. {
         0.
     } else {
-        (p.x - lane_start.x) / vector_x
+        (p.x - lane_start.x) / vector.x
     };
-    let right_part = if vector_y == 0. {
+    let right_part = if vector.y == 0. {
         0.
     } else {
-        (p.y - lane_start.y) / vector_y
+        (p.y - lane_start.y) / vector.y
     };
 
     let is_on_lane = left_part - right_part;
