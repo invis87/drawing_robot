@@ -2,11 +2,45 @@ use svgtypes::{PathCommand, PathSegment};
 
 use super::math::*;
 use super::tick_timer::TickTimer;
+use core::ops::{Mul, Add};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Point {
     pub x: f64,
     pub y: f64,
+}
+
+impl Mul<f64> for Point {
+    type Output = Point;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        Point {
+            x: self.x * rhs,
+            y: self.y * rhs
+        }
+    }
+}
+
+impl Add<f64> for Point {
+    type Output = Point;
+
+    fn add(self, rhs: f64) -> Self::Output {
+        Point {
+            x: self.x + rhs,
+            y: self.y + rhs
+        }
+    }
+}
+
+impl Add<Point> for Point {
+    type Output = Point;
+
+    fn add(self, rhs: Point) -> Self::Output {
+        Point {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y
+        }
+    }
 }
 
 pub enum LineTo {
@@ -296,7 +330,7 @@ fn calc_point_iterator(
             next_segment,
         ),
         PathSegment::Quadratic { abs, x1, y1, x, y } => {
-            quadratic_curve_to(current, abs, x1, y1, x, y, next_segment)
+            quadratic_curve_to(*current, abs, x1, y1, x, y, next_segment)
         }
         PathSegment::SmoothQuadratic { abs, x, y } => {
             smooth_quadratic_curve_to(current, abs, x, y, prev_support_point_opt, next_segment)
@@ -396,7 +430,7 @@ fn smooth_cubic_curve_to(
 }
 
 fn quadratic_curve_to(
-    current: &Point,
+    current: Point,
     abs: bool,
     x1: f64,
     y1: f64,
@@ -412,7 +446,7 @@ fn quadratic_curve_to(
         point: Point { x: p1.x, y: p1.y },
     });
 
-    let p1_on_lane = is_point_on_lane(current, &end_point, &p1);
+    let p1_on_lane = is_point_on_lane(&current, &end_point, &p1);
     if p1_on_lane {
         Box::new(LinePointIterator::as_fake_curve(
             end_point.x,
@@ -421,7 +455,7 @@ fn quadratic_curve_to(
             support_point,
         ))
     } else {
-        let calc_formula = square_curve(current.x, current.y, p1, end_point);
+        let calc_formula = square_curve(current, p1, end_point);
         Box::new(CurvePointIterator {
             time,
             calc_formula,
@@ -440,7 +474,7 @@ fn smooth_quadratic_curve_to(
     next_segment: PathSegment,
 ) -> Box<dyn PointIterator> {
     let p1 = mirrored_point(current, abs, prev_support_point_opt, CurveType::Quadratic);
-    quadratic_curve_to(current, abs, p1.x, p1.y, x, y, next_segment)
+    quadratic_curve_to(*current, abs, p1.x, p1.y, x, y, next_segment)
 }
 
 fn ellipse_curve_to(

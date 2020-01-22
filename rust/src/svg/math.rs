@@ -1,45 +1,36 @@
 use super::svg_curve::Point;
-
-const PI: f64 = 3.14159265358979323846264338327950288_f64;
+use core::f64::consts::PI;
 
 pub fn square_curve(
-    start_x: f64,
-    start_y: f64,
+    start: Point,
     p1: Point,
     end: Point,
-) -> Box<dyn Fn(f64) -> Point> {
+) -> impl Fn(f64) -> Point {
     Box::new(move |t: f64| {
         let diff = 1. - t;
         let square_t = t * t;
         let square_diff = diff * diff;
-        let x = start_x * square_diff + p1.x * 2. * t * diff + end.x * square_t;
-        let y = start_y * square_diff + p1.y * 2. * t * diff + end.y * square_t;
-        Point { x, y }
+        start * square_diff + p1 * 2. * t * diff + end *square_t
     })
 }
 
 pub fn cubic_curve(
-    start_x: f64,
-    start_y: f64,
+    start: Point,
     p1: Point,
     p2: Point,
     end: Point,
-) -> Box<dyn Fn(f64) -> Point> {
+) -> impl Fn(f64) -> Point {
     Box::new(move |t: f64| {
         let diff = 1. - t;
         let square_t = t * t;
         let cube_t = square_t * t;
         let square_diff = diff * diff;
         let cube_diff = square_diff * diff;
-        let x = start_x * cube_diff
-            + p1.x * 3. * t * square_diff
-            + p2.x * 3. * square_t * diff
-            + end.x * cube_t;
-        let y = start_y * cube_diff
-            + p1.y * 3. * t * square_diff
-            + p2.y * 3. * square_t * diff
-            + end.y * cube_t;
-        Point { x, y }
+
+        start * cube_diff
+            + p1 * 3. * t * square_diff
+            + p2 * 3. * square_t * diff
+            + end * cube_t
     })
 }
 
@@ -51,7 +42,7 @@ pub fn ellipse_curve(
     x_rad_rotation: f64,
     center_x: f64,
     center_y: f64,
-) -> Box<dyn Fn(f64) -> Point> {
+) -> impl Fn(f64) -> Point {
     Box::new(move |t: f64| {
         let angle = start_angle + sweep_angle * t;
         let ellipse_component_x = rx_abs * angle.cos();
@@ -159,7 +150,7 @@ pub fn sqr(x: f64) -> f64 {
     x * x
 }
 
-pub fn angle_between(start_x: f64, start_y: f64, end_x: f64, end_y: f64) -> f64 {
+pub fn angle_between(start: Point, end: Point) -> f64 {
     let p = start_x * end_x + start_y * end_y;
     let n = ((sqr(start_x) + sqr(start_y)) * (sqr(end_x) + sqr(end_y))).sqrt();
     let sign = if start_x * end_y - start_y * end_x < 0. {
