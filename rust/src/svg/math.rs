@@ -104,10 +104,13 @@ pub fn ellipse_support_calc(
         center_radicand = 0.
     };
 
-    let center_coef = if large_arc != sweep {
-        1. * center_radicand.sqrt()
-    } else {
-        -1. * center_radicand.sqrt()
+    let center_coef = {
+        let sqrt = center_radicand.sqrt();
+        if large_arc != sweep {
+            sqrt
+        } else {
+            -sqrt
+        }
     };
     let center_x_rotated = center_coef * (rx_abs * dy_rotated / ry_abs);
     let center_y_rotated = center_coef * (-ry_abs * dx_rotated / rx_abs);

@@ -115,8 +115,8 @@ pub fn points_from_path_segments<'a>(
             prev_support_point_opt,
             path_start_point,
         );
-        prev_support_point_opt = point_iterator.get_support_point();
-        current_point = point_iterator.get_end_position();
+        prev_support_point_opt = point_iterator.support_point();
+        current_point = point_iterator.end_position();
 
         if !path_start_point_initialized && path_segment.cmd() != PathCommand::ClosePath {
             path_start_point_initialized = true;
@@ -146,8 +146,8 @@ struct SupportPoint {
 }
 
 trait PointIterator: Iterator<Item = Point> {
-    fn get_support_point(&self) -> Option<SupportPoint>; //support point is always in absolute
-    fn get_end_position(&self) -> Point;
+    fn support_point(&self) -> Option<SupportPoint>; //support point is always in absolute
+    fn end_position(&self) -> Point;
     fn move_type(&self) -> MoveType;
 }
 
@@ -164,11 +164,11 @@ impl Iterator for EmptyPointIterator {
 }
 
 impl PointIterator for EmptyPointIterator {
-    fn get_support_point(&self) -> Option<SupportPoint> {
+    fn support_point(&self) -> Option<SupportPoint> {
         None
     }
 
-    fn get_end_position(&self) -> Point {
+    fn end_position(&self) -> Point {
         self.end
     }
 
@@ -222,11 +222,11 @@ impl Iterator for LinePointIterator {
 }
 
 impl PointIterator for LinePointIterator {
-    fn get_support_point(&self) -> Option<SupportPoint> {
+    fn support_point(&self) -> Option<SupportPoint> {
         self.support_point
     }
 
-    fn get_end_position(&self) -> Point {
+    fn end_position(&self) -> Point {
         self.end
     }
 
@@ -254,11 +254,11 @@ impl<F: Fn(f64) -> Point> Iterator for CurvePointIterator<F> {
 }
 
 impl<F: Fn(f64) -> Point> PointIterator for CurvePointIterator<F> {
-    fn get_support_point(&self) -> Option<SupportPoint> {
+    fn support_point(&self) -> Option<SupportPoint> {
         self.support_point
     }
 
-    fn get_end_position(&self) -> Point {
+    fn end_position(&self) -> Point {
         (self.calc_formula)(1.0)
     }
 
@@ -285,11 +285,11 @@ impl<F: Fn(f64) -> Point> Iterator for EllipsePointIterator<F> {
 }
 
 impl<F: Fn(f64) -> Point> PointIterator for EllipsePointIterator<F> {
-    fn get_support_point(&self) -> Option<SupportPoint> {
+    fn support_point(&self) -> Option<SupportPoint> {
         None
     }
 
-    fn get_end_position(&self) -> Point {
+    fn end_position(&self) -> Point {
         self.end
     }
 
