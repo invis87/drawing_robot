@@ -59,7 +59,7 @@ pub fn cubic_curve(
     CubicCurve { start, p1, p2, end }
 }
 
-struct EllipsePoint {
+struct EllipseCurve {
     start_angle: f64,
     sweep_angle: f64,
     rx_abs: f64,
@@ -69,7 +69,7 @@ struct EllipsePoint {
     center_y: f64,
 }
 
-impl CurvePoint for EllipsePoint {
+impl CurvePoint for EllipseCurve {
     fn at(&self, time: f64) -> Point {
         let angle = self.start_angle + self.sweep_angle * time;
         let ellipse_component_x = self.rx_abs * angle.cos();
@@ -95,7 +95,7 @@ pub fn ellipse_curve(
     center_x: f64,
     center_y: f64,
 ) -> impl CurvePoint {
-    EllipsePoint {
+    EllipseCurve {
         start_angle,
         sweep_angle,
         rx_abs,
