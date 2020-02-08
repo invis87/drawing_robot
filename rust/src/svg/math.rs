@@ -5,7 +5,7 @@ pub trait CurvePoint {
     fn at(&self, time: f64) -> Point;
 }
 
-struct SquareCurve {
+pub struct SquareCurve {
     start: Point,
     p1: Point,
     end: Point
@@ -20,15 +20,16 @@ impl CurvePoint for SquareCurve {
     }
 }
 
+//todo: to refactor
 pub fn square_curve(
     start: Point,
     p1: Point,
     end: Point,
-) -> impl CurvePoint {
+) -> SquareCurve {
     SquareCurve { start, p1, end }
 }
 
-struct CubicCurve {
+pub struct CubicCurve {
     start: Point,
     p1: Point,
     p2: Point,
@@ -50,16 +51,17 @@ impl CurvePoint for CubicCurve {
     }
 }
 
+//todo: to refactor
 pub fn cubic_curve(
     start: Point,
     p1: Point,
     p2: Point,
     end: Point,
-) -> impl CurvePoint {
+) -> CubicCurve {
     CubicCurve { start, p1, p2, end }
 }
 
-struct EllipseCurve {
+pub struct EllipseCurve {
     start_angle: f64,
     sweep_angle: f64,
     rx_abs: f64,
@@ -86,6 +88,7 @@ impl CurvePoint for EllipseCurve {
     }
 }
 
+//todo: to refactor
 pub fn ellipse_curve(
     start_angle: f64,
     sweep_angle: f64,
@@ -94,7 +97,7 @@ pub fn ellipse_curve(
     x_rad_rotation: f64,
     center_x: f64,
     center_y: f64,
-) -> impl CurvePoint {
+) -> EllipseCurve {
     EllipseCurve {
         start_angle,
         sweep_angle,

@@ -65,38 +65,12 @@ struct SupportPoint {
     point: Point,
 }
 
-trait PointIterator: Iterator<Item = Point> {
-    fn support_point(&self) -> Option<SupportPoint>; //support point is always in absolute
-    fn end_position(&self) -> Point;
-    fn move_type(&self) -> MoveType;
-}
-
+// === === === EMPTY === === ===
 struct EmptyPointIterator {
     end: Point,
 }
 
-impl Iterator for EmptyPointIterator {
-    type Item = Point;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        None
-    }
-}
-
-impl PointIterator for EmptyPointIterator {
-    fn support_point(&self) -> Option<SupportPoint> {
-        None
-    }
-
-    fn end_position(&self) -> Point {
-        self.end
-    }
-
-    fn move_type(&self) -> MoveType {
-        MoveType::Fly
-    }
-}
-
+// === === === LINE === === ===
 struct LinePointIterator {
     end: Point,
     move_type: MoveType,
@@ -114,6 +88,7 @@ impl LinePointIterator {
         }
     }
 
+    //todo: why I need that "fake" at all?
     fn as_fake_curve(
         end: Point,
         move_type: MoveType,
@@ -128,33 +103,7 @@ impl LinePointIterator {
     }
 }
 
-impl Iterator for LinePointIterator {
-    type Item = Point;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.done {
-            None
-        } else {
-            self.done = true;
-            Some(self.end)
-        }
-    }
-}
-
-impl PointIterator for LinePointIterator {
-    fn support_point(&self) -> Option<SupportPoint> {
-        self.support_point
-    }
-
-    fn end_position(&self) -> Point {
-        self.end
-    }
-
-    fn move_type(&self) -> MoveType {
-        self.move_type
-    }
-}
-
+// === === === CURVE === === ===
 struct CurvePointIterator<F: CurvePoint> {
     time: TickTimer,
     calc_formula: F,
@@ -162,58 +111,102 @@ struct CurvePointIterator<F: CurvePoint> {
     support_point: Option<SupportPoint>,
 }
 
-impl<F: CurvePoint> Iterator for CurvePointIterator<F> {
-    type Item = Point;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.time.next() {
-            Some(time) => Some((self.calc_formula.at(time))),
-            None => None,
-        }
-    }
-}
-
-impl<F: CurvePoint> PointIterator for CurvePointIterator<F> {
-    fn support_point(&self) -> Option<SupportPoint> {
-        self.support_point
-    }
-
-    fn end_position(&self) -> Point {
-        (self.calc_formula.at(1.0))}
-
-    fn move_type(&self) -> MoveType {
-        self.move_type
-    }
-}
-
+// === === === ELLIPSE === === ===
+//todo: ellipse can have only one type of F
 struct EllipsePointIterator<F: CurvePoint> {
     time: TickTimer,
     calc_formula: F,
     end: Point,
 }
 
-impl<F: CurvePoint> Iterator for EllipsePointIterator<F> {
-    type Item = Point;
+// === === === POINT ITERATOR === === ===
+enum PointIterator {
+    Empty(EmptyPointIterator),
+    Line(LinePointIterator),
+    SquareCurve(CurvePointIterator<SquareCurve>),
+    CubicCurve(CurvePointIterator<CubicCurve>),
+    EllipseCurve(EllipsePointIterator<EllipseCurve>)
+}
 
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.time.next() {
-            Some(time) => Some(self.calc_formula.at(time)),
-            None => None,
+//todo: looks like I can remove one layer of abstraction!
+impl PointIterator {
+    //support point is always in absolute
+    fn support_point(&self) -> Option<SupportPoint> {
+        match self {
+            PointIterator::Empty(_) => None,
+            PointIterator::Line(iter) => iter.support_point,
+            PointIterator::SquareCurve(iter) => {
+                iter.support_point
+            },
+            PointIterator::CubicCurve(iter) => {
+                iter.support_point
+            },
+            PointIterator::EllipseCurve(_) => None,
+        }
+    }
+
+    fn end_position(&self) -> Point {
+        match self {
+            PointIterator::Empty(iter) => iter.end,
+            PointIterator::Line(iter) => iter.end,
+            PointIterator::SquareCurve(iter) => {
+                iter.calc_formula.at(1.0)
+            },
+            PointIterator::CubicCurve(iter) => {
+                iter.calc_formula.at(1.0)
+            },
+            PointIterator::EllipseCurve(iter) => iter.end,
+        }
+    }
+
+    fn move_type(&self) -> MoveType {
+        match self {
+            PointIterator::Empty(_) => MoveType::Fly,
+            PointIterator::Line(iter) => iter.move_type,
+            PointIterator::SquareCurve(iter) => {
+                iter.move_type
+            },
+            PointIterator::CubicCurve(iter) => {
+                iter.move_type
+            },
+            PointIterator::EllipseCurve(_) => MoveType::Draw, //todo: why for ellipse it is always Draw, but not for Curve?
         }
     }
 }
 
-impl<F: CurvePoint> PointIterator for EllipsePointIterator<F> {
-    fn support_point(&self) -> Option<SupportPoint> {
-        None
-    }
+impl Iterator for PointIterator {
+    type Item = Point;
 
-    fn end_position(&self) -> Point {
-        self.end
-    }
-
-    fn move_type(&self) -> MoveType {
-        MoveType::Draw
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            PointIterator::Empty(_) => None,
+            PointIterator::Line(iter) => {
+                if iter.done {
+                    None
+                } else {
+                    iter.done = true;
+                    Some(iter.end)
+                }
+            },
+            PointIterator::SquareCurve(iter) => {
+                match iter.time.next() {
+                    Some(time) => Some((iter.calc_formula.at(time))),
+                    None => None,
+                }
+            },
+            PointIterator::CubicCurve(iter) => {
+                match iter.time.next() {
+                    Some(time) => Some((iter.calc_formula.at(time))),
+                    None => None,
+                }
+            },
+            PointIterator::EllipseCurve(iter) => {
+                match iter.time.next() {
+                    Some(time) => Some(iter.calc_formula.at(time)),
+                    None => None,
+                }
+            },
+        }
     }
 }
 
@@ -221,18 +214,18 @@ fn calc_point_iterator(
     current: Point,
     next_segment: PathSegment,
     prev_support_point_opt: Option<SupportPoint>,
-    path_start_point: Point, //want that to implement ClosePath
-) -> Box<dyn PointIterator> {
+    path_start_point: Point, //need that to implement ClosePath
+) -> PointIterator {
     match next_segment {
-        PathSegment::MoveTo { abs, x, y } => Box::new(move_to(current, abs, x, y)),
-        PathSegment::LineTo { abs, x, y } => Box::new(line_to(current, abs, x, y)),
+        PathSegment::MoveTo { abs, x, y } => move_to(current, abs, x, y),
+        PathSegment::LineTo { abs, x, y } => line_to(current, abs, x, y),
         PathSegment::HorizontalLineTo { abs, x } => {
             let miss_coord = if abs { current.y } else { 0. };
-            Box::new(line_to(current, abs, x, miss_coord))
+            line_to(current, abs, x, miss_coord)
         }
         PathSegment::VerticalLineTo { abs, y } => {
             let miss_coord = if abs { current.x } else { 0. };
-            Box::new(line_to(current, abs, miss_coord, y))
+            line_to(current, abs, miss_coord, y)
         }
         PathSegment::CurveTo {
             abs,
@@ -279,23 +272,23 @@ fn calc_point_iterator(
             x,
             y,
         ),
-        PathSegment::ClosePath { abs: _ } => Box::new(line_to(
+        PathSegment::ClosePath { abs: _ } => line_to(
             current,
             true,
             path_start_point.x,
             path_start_point.y,
-        )),
+        ),
     }
 }
 
-fn move_to(current: Point, abs: bool, x: f64, y: f64) -> LinePointIterator {
+fn move_to(current: Point, abs: bool, x: f64, y: f64) -> PointIterator {
     let end_point = absolute_point_coord(current, abs, x, y);
-    LinePointIterator::new(end_point, MoveType::Fly)
+    PointIterator::Line(LinePointIterator::new(end_point, MoveType::Fly))
 }
 
-fn line_to(current: Point, abs: bool, x: f64, y: f64) -> LinePointIterator {
+fn line_to(current: Point, abs: bool, x: f64, y: f64) -> PointIterator {
     let end_point = absolute_point_coord(current, abs, x, y);
-    LinePointIterator::new(end_point, MoveType::Draw)
+    PointIterator::Line(LinePointIterator::new(end_point, MoveType::Draw))
 }
 
 fn cubic_curve_to(
@@ -308,7 +301,7 @@ fn cubic_curve_to(
     x: f64,
     y: f64,
     next_segment: PathSegment,
-) -> Box<dyn PointIterator> {
+) -> PointIterator {
     let time: TickTimer = Default::default();
     let p1 = absolute_point_coord(current, abs, x1, y1);
     let p2 = absolute_point_coord(current, abs, x2, y2);
@@ -322,19 +315,20 @@ fn cubic_curve_to(
     let p2_on_lane = is_point_on_lane(current, end_point, &p2);
 
     if p1_on_lane && p2_on_lane {
-        Box::new(LinePointIterator::as_fake_curve(
+        PointIterator::Line(LinePointIterator::as_fake_curve(
             end_point,
             MoveType::Draw,
             support_point,
         ))
     } else {
         let calc_formula = cubic_curve(current, p1, p2, end_point);
-        Box::new(CurvePointIterator {
+        let cubic_curve_iterator = CurvePointIterator {
             time,
             calc_formula,
             move_type: MoveType::Draw,
             support_point,
-        })
+        };
+        PointIterator::CubicCurve(cubic_curve_iterator)
     }
 }
 
@@ -347,7 +341,7 @@ fn smooth_cubic_curve_to(
     y: f64,
     prev_support_point_opt: Option<SupportPoint>,
     next_segment: PathSegment,
-) -> Box<dyn PointIterator> {
+) -> PointIterator {
     let p1 = mirrored_point(current, abs, prev_support_point_opt, CurveType::Cubic);
     cubic_curve_to(current, abs, p1.x, p1.y, x2, y2, x, y, next_segment)
 }
@@ -360,7 +354,7 @@ fn quadratic_curve_to(
     x: f64,
     y: f64,
     next_segment: PathSegment,
-) -> Box<dyn PointIterator> {
+) -> PointIterator {
     let time: TickTimer = Default::default();
     let p1 = absolute_point_coord(current, abs, x1, y1);
     let end_point = absolute_point_coord(current, abs, x, y);
@@ -371,19 +365,20 @@ fn quadratic_curve_to(
 
     let p1_on_lane = is_point_on_lane(current, end_point, &p1);
     if p1_on_lane {
-        Box::new(LinePointIterator::as_fake_curve(
+        PointIterator::Line(LinePointIterator::as_fake_curve(
             end_point,
             MoveType::Draw,
             support_point,
         ))
     } else {
         let calc_formula = square_curve(current, p1, end_point);
-        Box::new(CurvePointIterator {
+        let square_curve_iterator = CurvePointIterator {
             time,
             calc_formula,
             move_type: MoveType::Draw,
             support_point,
-        })
+        };
+        PointIterator::SquareCurve(square_curve_iterator)
     }
 }
 
@@ -394,7 +389,7 @@ fn smooth_quadratic_curve_to(
     y: f64,
     prev_support_point_opt: Option<SupportPoint>,
     next_segment: PathSegment,
-) -> Box<dyn PointIterator> {
+) -> PointIterator {
     let p1 = mirrored_point(current, abs, prev_support_point_opt, CurveType::Quadratic);
     quadratic_curve_to(current, abs, p1.x, p1.y, x, y, next_segment)
 }
@@ -409,21 +404,21 @@ fn ellipse_curve_to(
     sweep: bool,
     end_x: f64,
     end_y: f64,
-) -> Box<dyn PointIterator> {
+) -> PointIterator {
     let time: TickTimer = Default::default();
 
     let end_point = absolute_point_coord(current, abs, end_x, end_y);
 
     // If the endpoints are identical, then this is equivalent to omitting the elliptical arc segment entirely.
     if current == end_point {
-        return Box::new(EmptyPointIterator {
+        return PointIterator::Empty(EmptyPointIterator {
             end: end_point,
         });
     }
 
     // If rx = 0 or ry = 0 then this arc is treated as a straight line segment joining the endpoints.
     if rx == 0. || ry == 0. {
-        return Box::new(line_to(current, abs, end_x, end_y));
+        return line_to(current, abs, end_x, end_y);
     }
 
     let (start_angle, sweep_angle, rx_abs, ry_abs, x_rad_rotation, center_x, center_y) =
@@ -447,7 +442,7 @@ fn ellipse_curve_to(
         center_x,
         center_y,
     );
-    Box::new(EllipsePointIterator {
+    PointIterator::EllipseCurve(EllipsePointIterator {
         time,
         calc_formula,
         end: end_point
