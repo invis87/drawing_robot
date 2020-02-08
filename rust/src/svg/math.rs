@@ -28,14 +28,14 @@ pub fn square_curve(
     SquareCurve { start, p1, end }
 }
 
-struct CubicPoint {
+struct CubicCurve {
     start: Point,
     p1: Point,
     p2: Point,
     end: Point
 }
 
-impl CurvePoint for CubicPoint {
+impl CurvePoint for CubicCurve {
     fn at(&self, time: f64) -> Point {
         let diff = 1. - time;
         let square_t = time * time;
@@ -56,7 +56,7 @@ pub fn cubic_curve(
     p2: Point,
     end: Point,
 ) -> impl CurvePoint {
-    CubicPoint { start, p1, p2, end }
+    CubicCurve { start, p1, p2, end }
 }
 
 struct EllipsePoint {
