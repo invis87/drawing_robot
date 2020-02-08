@@ -235,32 +235,31 @@ impl PointIterator for LinePointIterator {
     }
 }
 
-struct CurvePointIterator<F: Fn(f64) -> Point> {
+struct CurvePointIterator<F: CurvePoint> {
     time: TickTimer,
     calc_formula: F,
     move_type: MoveType,
     support_point: Option<SupportPoint>,
 }
 
-impl<F: Fn(f64) -> Point> Iterator for CurvePointIterator<F> {
+impl<F: CurvePoint> Iterator for CurvePointIterator<F> {
     type Item = Point;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.time.next() {
-            Some(time) => Some((self.calc_formula)(time)),
+            Some(time) => Some((self.calc_formula.at(time))),
             None => None,
         }
     }
 }
 
-impl<F: Fn(f64) -> Point> PointIterator for CurvePointIterator<F> {
+impl<F: CurvePoint> PointIterator for CurvePointIterator<F> {
     fn support_point(&self) -> Option<SupportPoint> {
         self.support_point
     }
 
     fn end_position(&self) -> Point {
-        (self.calc_formula)(1.0)
-    }
+        (self.calc_formula.at(1.0))}
 
     fn move_type(&self) -> MoveType {
         self.move_type

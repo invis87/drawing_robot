@@ -1,17 +1,53 @@
 use super::svg_curve::Point;
 use core::f64::consts::PI;
 
+pub trait CurvePoint {
+    fn at(&self, time: f64) -> Point;
+}
+
+struct SquareCurve {
+    start: Point,
+    p1: Point,
+    end: Point
+}
+
+impl CurvePoint for SquareCurve {
+    fn at(&self, time: f64) -> Point {
+        let diff = 1. - time;
+        let square_t = time * time;
+        let square_diff = diff * diff;
+        self.start * square_diff + self.p1 * 2. * time * diff + self.end * square_t
+    }
+}
+
 pub fn square_curve(
     start: Point,
     p1: Point,
     end: Point,
-) -> impl Fn(f64) -> Point {
-    Box::new(move |t: f64| {
-        let diff = 1. - t;
-        let square_t = t * t;
+) -> impl CurvePoint {
+    SquareCurve { start, p1, end }
+}
+
+struct CubicPoint {
+    start: Point,
+    p1: Point,
+    p2: Point,
+    end: Point
+}
+
+impl CurvePoint for CubicPoint {
+    fn at(&self, time: f64) -> Point {
+        let diff = 1. - time;
+        let square_t = time * time;
+        let cube_t = square_t * time;
         let square_diff = diff * diff;
-        start * square_diff + p1 * 2. * t * diff + end *square_t
-    })
+        let cube_diff = square_diff * diff;
+
+        self.start * cube_diff
+            + self.p1 * 3. * time * square_diff
+            + self.p2 * 3. * square_t * diff
+            + self.end * cube_t
+    }
 }
 
 pub fn cubic_curve(
@@ -19,19 +55,35 @@ pub fn cubic_curve(
     p1: Point,
     p2: Point,
     end: Point,
-) -> impl Fn(f64) -> Point {
-    Box::new(move |t: f64| {
-        let diff = 1. - t;
-        let square_t = t * t;
-        let cube_t = square_t * t;
-        let square_diff = diff * diff;
-        let cube_diff = square_diff * diff;
+) -> impl CurvePoint {
+    CubicPoint { start, p1, p2, end }
+}
 
-        start * cube_diff
-            + p1 * 3. * t * square_diff
-            + p2 * 3. * square_t * diff
-            + end * cube_t
-    })
+struct EllipsePoint {
+    start_angle: f64,
+    sweep_angle: f64,
+    rx_abs: f64,
+    ry_abs: f64,
+    x_rad_rotation: f64,
+    center_x: f64,
+    center_y: f64,
+}
+
+impl CurvePoint for EllipsePoint {
+    fn at(&self, time: f64) -> Point {
+        let angle = self.start_angle + self.sweep_angle * time;
+        let ellipse_component_x = self.rx_abs * angle.cos();
+        let ellipse_component_y = self.ry_abs * angle.sin();
+
+        let point_x = self.x_rad_rotation.cos() * ellipse_component_x
+            - self.x_rad_rotation.sin() * ellipse_component_y
+            + self.center_x;
+        let point_y = self.x_rad_rotation.sin() * ellipse_component_x
+            + self.x_rad_rotation.cos() * ellipse_component_y
+            + self.center_y;
+
+        Point::new(point_x, point_y)
+    }
 }
 
 pub fn ellipse_curve(
@@ -42,24 +94,16 @@ pub fn ellipse_curve(
     x_rad_rotation: f64,
     center_x: f64,
     center_y: f64,
-) -> impl Fn(f64) -> Point {
-    Box::new(move |t: f64| {
-        let angle = start_angle + sweep_angle * t;
-        let ellipse_component_x = rx_abs * angle.cos();
-        let ellipse_component_y = ry_abs * angle.sin();
-
-        let point_x = x_rad_rotation.cos() * ellipse_component_x
-            - x_rad_rotation.sin() * ellipse_component_y
-            + center_x;
-        let point_y = x_rad_rotation.sin() * ellipse_component_x
-            + x_rad_rotation.cos() * ellipse_component_y
-            + center_y;
-
-        Point {
-            x: point_x,
-            y: point_y,
-        }
-    })
+) -> impl CurvePoint {
+    EllipsePoint {
+        start_angle,
+        sweep_angle,
+        rx_abs,
+        ry_abs,
+        x_rad_rotation,
+        center_x,
+        center_y,
+    }
 }
 
 pub fn ellipse_support_calc(
