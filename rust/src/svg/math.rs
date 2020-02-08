@@ -1,4 +1,4 @@
-use super::svg_curve::Point;
+use super::point::Point;
 use core::f64::consts::PI;
 
 pub trait CurvePoint {

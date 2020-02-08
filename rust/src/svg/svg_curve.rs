@@ -2,87 +2,7 @@ use svgtypes::{PathCommand, PathSegment};
 
 use super::math::*;
 use super::tick_timer::TickTimer;
-use core::ops::{Mul, Add, Sub, Div};
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Point {
-    pub x: f64,
-    pub y: f64,
-}
-
-impl Point {
-    pub fn new(x: f64, y: f64) -> Self {
-        Point {x, y}
-    }
-
-    pub const ZERO: Point = Point {x: 0., y: 0.};
-}
-
-impl Div<f64> for Point {
-    type Output = Point;
-
-    fn div(self, rhs: f64) -> Self::Output {
-        Point {
-            x: self.x / rhs,
-            y: self.y / rhs
-        }
-    }
-}
-
-impl Mul<f64> for Point {
-    type Output = Point;
-
-    fn mul(self, rhs: f64) -> Self::Output {
-        Point {
-            x: self.x * rhs,
-            y: self.y * rhs
-        }
-    }
-}
-
-impl Add<f64> for Point {
-    type Output = Point;
-
-    fn add(self, rhs: f64) -> Self::Output {
-        Point {
-            x: self.x + rhs,
-            y: self.y + rhs
-        }
-    }
-}
-
-impl Add<Point> for Point {
-    type Output = Point;
-
-    fn add(self, rhs: Point) -> Self::Output {
-        Point {
-            x: self.x + rhs.x,
-            y: self.y + rhs.y
-        }
-    }
-}
-
-impl Sub<Point> for Point {
-    type Output = Point;
-
-    fn sub(self, rhs: Point) -> Self::Output {
-        Point {
-            x: self.x - rhs.x,
-            y: self.y - rhs.y
-        }
-    }
-}
-
-impl Sub<f64> for Point {
-    type Output = Point;
-
-    fn sub(self, rhs: f64) -> Self::Output {
-        Point {
-            x: self.x - rhs,
-            y: self.y - rhs
-        }
-    }
-}
+use super::point::*;
 
 pub enum LineTo {
     Fly(Point),
@@ -266,24 +186,24 @@ impl<F: CurvePoint> PointIterator for CurvePointIterator<F> {
     }
 }
 
-struct EllipsePointIterator<F: Fn(f64) -> Point> {
+struct EllipsePointIterator<F: CurvePoint> {
     time: TickTimer,
     calc_formula: F,
     end: Point,
 }
 
-impl<F: Fn(f64) -> Point> Iterator for EllipsePointIterator<F> {
+impl<F: CurvePoint> Iterator for EllipsePointIterator<F> {
     type Item = Point;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.time.next() {
-            Some(time) => Some((self.calc_formula)(time)),
+            Some(time) => Some(self.calc_formula.at(time)),
             None => None,
         }
     }
 }
 
-impl<F: Fn(f64) -> Point> PointIterator for EllipsePointIterator<F> {
+impl<F: CurvePoint> PointIterator for EllipsePointIterator<F> {
     fn support_point(&self) -> Option<SupportPoint> {
         None
     }
