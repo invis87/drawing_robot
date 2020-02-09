@@ -175,18 +175,15 @@ impl Iterator for PointIterator {
                     Some(iter.end)
                 }
             }
-            PointIterator::SquareCurve(iter) => match iter.time.next() {
-                Some(time) => Some((iter.calc_formula.at(time))),
-                None => None,
-            },
-            PointIterator::CubicCurve(iter) => match iter.time.next() {
-                Some(time) => Some((iter.calc_formula.at(time))),
-                None => None,
-            },
-            PointIterator::EllipseCurve(iter) => match iter.time.next() {
-                Some(time) => Some(iter.calc_formula.at(time)),
-                None => None,
-            },
+            PointIterator::SquareCurve(iter) => {
+                iter.time.next().map(|time| iter.calc_formula.at(time))
+            }
+            PointIterator::CubicCurve(iter) => {
+                iter.time.next().map(|time| iter.calc_formula.at(time))
+            }
+            PointIterator::EllipseCurve(iter) => {
+                iter.time.next().map(|time| iter.calc_formula.at(time))
+            }
         }
     }
 }
