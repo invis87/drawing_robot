@@ -106,14 +106,12 @@ impl LinePointIterator {
 struct SquareCurvePointIterator {
     time: TickTimer,
     calc_formula: SquareCurve,
-    move_type: MoveType,
     support_point: Option<SupportPoint>,
 }
 
 struct CubicCurvePointIterator {
     time: TickTimer,
     calc_formula: CubicCurve,
-    move_type: MoveType,
     support_point: Option<SupportPoint>,
 }
 
@@ -168,13 +166,9 @@ impl PointIterator {
         match self {
             PointIterator::Empty(_) => MoveType::Fly,
             PointIterator::Line(iter) => iter.move_type,
-            PointIterator::SquareCurve(iter) => {
-                iter.move_type
-            },
-            PointIterator::CubicCurve(iter) => {
-                iter.move_type
-            },
-            PointIterator::EllipseCurve(_) => MoveType::Draw, //todo: why for ellipse it is always Draw, but not for Curve?
+            PointIterator::SquareCurve(_) => MoveType::Draw,
+            PointIterator::CubicCurve(_) => MoveType::Draw,
+            PointIterator::EllipseCurve(_) => MoveType::Draw,
         }
     }
 }
@@ -330,7 +324,6 @@ fn cubic_curve_to(
         let cubic_curve_iterator = CubicCurvePointIterator {
             time,
             calc_formula,
-            move_type: MoveType::Draw,
             support_point,
         };
         PointIterator::CubicCurve(cubic_curve_iterator)
@@ -380,7 +373,6 @@ fn quadratic_curve_to(
         let square_curve_iterator = SquareCurvePointIterator {
             time,
             calc_formula,
-            move_type: MoveType::Draw,
             support_point,
         };
         PointIterator::SquareCurve(square_curve_iterator)
