@@ -103,18 +103,24 @@ impl LinePointIterator {
 }
 
 // === === === CURVE === === ===
-struct CurvePointIterator<F: CurvePoint> {
+struct SquareCurvePointIterator {
     time: TickTimer,
-    calc_formula: F,
+    calc_formula: SquareCurve,
+    move_type: MoveType,
+    support_point: Option<SupportPoint>,
+}
+
+struct CubicCurvePointIterator {
+    time: TickTimer,
+    calc_formula: CubicCurve,
     move_type: MoveType,
     support_point: Option<SupportPoint>,
 }
 
 // === === === ELLIPSE === === ===
-//todo: ellipse can have only one type of F
-struct EllipsePointIterator<F: CurvePoint> {
+struct EllipsePointIterator {
     time: TickTimer,
-    calc_formula: F,
+    calc_formula: EllipseCurve,
     end: Point,
 }
 
@@ -122,9 +128,9 @@ struct EllipsePointIterator<F: CurvePoint> {
 enum PointIterator {
     Empty(EmptyPointIterator),
     Line(LinePointIterator),
-    SquareCurve(CurvePointIterator<SquareCurve>),
-    CubicCurve(CurvePointIterator<CubicCurve>),
-    EllipseCurve(EllipsePointIterator<EllipseCurve>)
+    SquareCurve(SquareCurvePointIterator),
+    CubicCurve(CubicCurvePointIterator),
+    EllipseCurve(EllipsePointIterator)
 }
 
 //todo: looks like I can remove one layer of abstraction!
@@ -321,7 +327,7 @@ fn cubic_curve_to(
         ))
     } else {
         let calc_formula = CubicCurve::new(current, p1, p2, end_point);
-        let cubic_curve_iterator = CurvePointIterator {
+        let cubic_curve_iterator = CubicCurvePointIterator {
             time,
             calc_formula,
             move_type: MoveType::Draw,
@@ -371,7 +377,7 @@ fn quadratic_curve_to(
         ))
     } else {
         let calc_formula = SquareCurve::new(current, p1, end_point);
-        let square_curve_iterator = CurvePointIterator {
+        let square_curve_iterator = SquareCurvePointIterator {
             time,
             calc_formula,
             move_type: MoveType::Draw,
