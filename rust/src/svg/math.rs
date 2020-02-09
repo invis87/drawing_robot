@@ -11,6 +11,12 @@ pub struct SquareCurve {
     end: Point
 }
 
+impl SquareCurve {
+    pub fn new(start: Point, p1: Point, end: Point) -> Self {
+        SquareCurve { start, p1, end }
+    }
+}
+
 impl CurvePoint for SquareCurve {
     fn at(&self, time: f64) -> Point {
         let diff = 1. - time;
@@ -20,20 +26,20 @@ impl CurvePoint for SquareCurve {
     }
 }
 
-//todo: to refactor
-pub fn square_curve(
-    start: Point,
-    p1: Point,
-    end: Point,
-) -> SquareCurve {
-    SquareCurve { start, p1, end }
-}
-
 pub struct CubicCurve {
     start: Point,
     p1: Point,
     p2: Point,
     end: Point
+}
+
+impl CubicCurve {
+    pub fn new(start: Point,
+               p1: Point,
+               p2: Point,
+               end: Point, ) -> Self {
+        CubicCurve { start, p1, p2, end }
+    }
 }
 
 impl CurvePoint for CubicCurve {
@@ -51,16 +57,6 @@ impl CurvePoint for CubicCurve {
     }
 }
 
-//todo: to refactor
-pub fn cubic_curve(
-    start: Point,
-    p1: Point,
-    p2: Point,
-    end: Point,
-) -> CubicCurve {
-    CubicCurve { start, p1, p2, end }
-}
-
 pub struct EllipseCurve {
     start_angle: f64,
     sweep_angle: f64,
@@ -69,6 +65,26 @@ pub struct EllipseCurve {
     x_rad_rotation: f64,
     center_x: f64,
     center_y: f64,
+}
+
+impl EllipseCurve {
+    pub fn new(start_angle: f64,
+               sweep_angle: f64,
+               rx_abs: f64,
+               ry_abs: f64,
+               x_rad_rotation: f64,
+               center_x: f64,
+               center_y: f64,) -> Self {
+        EllipseCurve {
+            start_angle,
+            sweep_angle,
+            rx_abs,
+            ry_abs,
+            x_rad_rotation,
+            center_x,
+            center_y,
+        }
+    }
 }
 
 impl CurvePoint for EllipseCurve {
@@ -85,27 +101,6 @@ impl CurvePoint for EllipseCurve {
             + self.center_y;
 
         Point::new(point_x, point_y)
-    }
-}
-
-//todo: to refactor
-pub fn ellipse_curve(
-    start_angle: f64,
-    sweep_angle: f64,
-    rx_abs: f64,
-    ry_abs: f64,
-    x_rad_rotation: f64,
-    center_x: f64,
-    center_y: f64,
-) -> EllipseCurve {
-    EllipseCurve {
-        start_angle,
-        sweep_angle,
-        rx_abs,
-        ry_abs,
-        x_rad_rotation,
-        center_x,
-        center_y,
     }
 }
 

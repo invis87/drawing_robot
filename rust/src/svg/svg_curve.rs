@@ -88,8 +88,7 @@ impl LinePointIterator {
         }
     }
 
-    //todo: why I need that "fake" at all?
-    fn as_fake_curve(
+    fn with_support(
         end: Point,
         move_type: MoveType,
         support_point: Option<SupportPoint>,
@@ -315,13 +314,13 @@ fn cubic_curve_to(
     let p2_on_lane = is_point_on_lane(current, end_point, &p2);
 
     if p1_on_lane && p2_on_lane {
-        PointIterator::Line(LinePointIterator::as_fake_curve(
+        PointIterator::Line(LinePointIterator::with_support(
             end_point,
             MoveType::Draw,
             support_point,
         ))
     } else {
-        let calc_formula = cubic_curve(current, p1, p2, end_point);
+        let calc_formula = CubicCurve::new(current, p1, p2, end_point);
         let cubic_curve_iterator = CurvePointIterator {
             time,
             calc_formula,
@@ -365,13 +364,13 @@ fn quadratic_curve_to(
 
     let p1_on_lane = is_point_on_lane(current, end_point, &p1);
     if p1_on_lane {
-        PointIterator::Line(LinePointIterator::as_fake_curve(
+        PointIterator::Line(LinePointIterator::with_support(
             end_point,
             MoveType::Draw,
             support_point,
         ))
     } else {
-        let calc_formula = square_curve(current, p1, end_point);
+        let calc_formula = SquareCurve::new(current, p1, end_point);
         let square_curve_iterator = CurvePointIterator {
             time,
             calc_formula,
@@ -433,7 +432,7 @@ fn ellipse_curve_to(
             end_point.y,
         );
 
-    let calc_formula = ellipse_curve(
+    let calc_formula = EllipseCurve::new(
         start_angle,
         sweep_angle,
         rx_abs,
