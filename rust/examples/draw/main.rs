@@ -13,7 +13,7 @@ use drawing_robot::svg::svg_curve::{points_from_path_segments, LineTo};
 use drawing_robot::svg::point::Point;
 use std::collections::LinkedList;
 
-fn points_to_draw() -> Box<dyn Iterator<Item = LineTo>> {
+fn points_to_draw() -> impl Iterator<Item = LineTo> {
     let svg_string = "M198.901,545.277c-4.035-3.746-7.869-7.492-11.702-11.632c-4.641-5.126-7.264-11.435-9.08-17.941
 						c-1.614-5.521-3.026-11.041-3.026-16.956c0-1.577,0-3.352-0.202-4.929c-2.421-11.436-1.009-23.068-1.21-34.503
 						c1.614-6.506,1.413-13.407,2.018-20.11c2.018-7.492,1.211-15.378,3.43-22.87c3.43-23.462,8.676-43.375,15.334-65.063
