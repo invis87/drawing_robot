@@ -1,8 +1,8 @@
 use svgtypes::{PathCommand, PathSegment};
 
 use super::math::*;
-use super::tick_timer::TickTimer;
 use super::point::*;
+use super::tick_timer::TickTimer;
 
 pub enum LineTo {
     Fly(Point),
@@ -88,11 +88,7 @@ impl LinePointIterator {
         }
     }
 
-    fn with_support(
-        end: Point,
-        move_type: MoveType,
-        support_point: Option<SupportPoint>,
-    ) -> Self {
+    fn with_support(end: Point, move_type: MoveType, support_point: Option<SupportPoint>) -> Self {
         LinePointIterator {
             end,
             move_type,
@@ -128,7 +124,7 @@ enum PointIterator {
     Line(LinePointIterator),
     SquareCurve(SquareCurvePointIterator),
     CubicCurve(CubicCurvePointIterator),
-    EllipseCurve(EllipsePointIterator)
+    EllipseCurve(EllipsePointIterator),
 }
 
 //todo: looks like I can remove one layer of abstraction!
@@ -138,12 +134,8 @@ impl PointIterator {
         match self {
             PointIterator::Empty(_) => None,
             PointIterator::Line(iter) => iter.support_point,
-            PointIterator::SquareCurve(iter) => {
-                iter.support_point
-            },
-            PointIterator::CubicCurve(iter) => {
-                iter.support_point
-            },
+            PointIterator::SquareCurve(iter) => iter.support_point,
+            PointIterator::CubicCurve(iter) => iter.support_point,
             PointIterator::EllipseCurve(_) => None,
         }
     }
@@ -152,12 +144,8 @@ impl PointIterator {
         match self {
             PointIterator::Empty(iter) => iter.end,
             PointIterator::Line(iter) => iter.end,
-            PointIterator::SquareCurve(iter) => {
-                iter.calc_formula.at(1.0)
-            },
-            PointIterator::CubicCurve(iter) => {
-                iter.calc_formula.at(1.0)
-            },
+            PointIterator::SquareCurve(iter) => iter.calc_formula.at(1.0),
+            PointIterator::CubicCurve(iter) => iter.calc_formula.at(1.0),
             PointIterator::EllipseCurve(iter) => iter.end,
         }
     }
@@ -186,24 +174,18 @@ impl Iterator for PointIterator {
                     iter.done = true;
                     Some(iter.end)
                 }
+            }
+            PointIterator::SquareCurve(iter) => match iter.time.next() {
+                Some(time) => Some((iter.calc_formula.at(time))),
+                None => None,
             },
-            PointIterator::SquareCurve(iter) => {
-                match iter.time.next() {
-                    Some(time) => Some((iter.calc_formula.at(time))),
-                    None => None,
-                }
+            PointIterator::CubicCurve(iter) => match iter.time.next() {
+                Some(time) => Some((iter.calc_formula.at(time))),
+                None => None,
             },
-            PointIterator::CubicCurve(iter) => {
-                match iter.time.next() {
-                    Some(time) => Some((iter.calc_formula.at(time))),
-                    None => None,
-                }
-            },
-            PointIterator::EllipseCurve(iter) => {
-                match iter.time.next() {
-                    Some(time) => Some(iter.calc_formula.at(time)),
-                    None => None,
-                }
+            PointIterator::EllipseCurve(iter) => match iter.time.next() {
+                Some(time) => Some(iter.calc_formula.at(time)),
+                None => None,
             },
         }
     }
@@ -271,12 +253,9 @@ fn calc_point_iterator(
             x,
             y,
         ),
-        PathSegment::ClosePath { abs: _ } => line_to(
-            current,
-            true,
-            path_start_point.x,
-            path_start_point.y,
-        ),
+        PathSegment::ClosePath { abs: _ } => {
+            line_to(current, true, path_start_point.x, path_start_point.y)
+        }
     }
 }
 
@@ -408,9 +387,7 @@ fn ellipse_curve_to(
 
     // If the endpoints are identical, then this is equivalent to omitting the elliptical arc segment entirely.
     if current == end_point {
-        return PointIterator::Empty(EmptyPointIterator {
-            end: end_point,
-        });
+        return PointIterator::Empty(EmptyPointIterator { end: end_point });
     }
 
     // If rx = 0 or ry = 0 then this arc is treated as a straight line segment joining the endpoints.
@@ -442,14 +419,14 @@ fn ellipse_curve_to(
     PointIterator::EllipseCurve(EllipsePointIterator {
         time,
         calc_formula,
-        end: end_point
+        end: end_point,
     })
 }
 
 fn absolute_point_coord(start: Point, abs: bool, x: f64, y: f64) -> Point {
     match abs {
         true => Point { x, y },
-        false => Point{ x, y } + start,
+        false => Point { x, y } + start,
     }
 }
 

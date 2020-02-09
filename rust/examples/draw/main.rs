@@ -9,8 +9,8 @@ use skulpin::VirtualKeyCode;
 use skulpin::{AppHandler, CoordinateSystem};
 use std::ffi::CString;
 
-use drawing_robot::svg::svg_curve::{points_from_path_segments, LineTo};
 use drawing_robot::svg::point::Point;
+use drawing_robot::svg::svg_curve::{points_from_path_segments, LineTo};
 use std::collections::LinkedList;
 
 fn points_to_draw() -> impl Iterator<Item = LineTo> {

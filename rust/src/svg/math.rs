@@ -8,7 +8,7 @@ pub trait CurvePoint {
 pub struct SquareCurve {
     start: Point,
     p1: Point,
-    end: Point
+    end: Point,
 }
 
 impl SquareCurve {
@@ -30,14 +30,11 @@ pub struct CubicCurve {
     start: Point,
     p1: Point,
     p2: Point,
-    end: Point
+    end: Point,
 }
 
 impl CubicCurve {
-    pub fn new(start: Point,
-               p1: Point,
-               p2: Point,
-               end: Point, ) -> Self {
+    pub fn new(start: Point, p1: Point, p2: Point, end: Point) -> Self {
         CubicCurve { start, p1, p2, end }
     }
 }
@@ -68,13 +65,15 @@ pub struct EllipseCurve {
 }
 
 impl EllipseCurve {
-    pub fn new(start_angle: f64,
-               sweep_angle: f64,
-               rx_abs: f64,
-               ry_abs: f64,
-               x_rad_rotation: f64,
-               center_x: f64,
-               center_y: f64,) -> Self {
+    pub fn new(
+        start_angle: f64,
+        sweep_angle: f64,
+        rx_abs: f64,
+        ry_abs: f64,
+        x_rad_rotation: f64,
+        center_x: f64,
+        center_y: f64,
+    ) -> Self {
         EllipseCurve {
             start_angle,
             sweep_angle,
